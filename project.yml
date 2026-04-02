@@ -3,7 +3,6 @@ options:
   bundleIdPrefix: com.voicegate
   deploymentTarget:
     iOS: "16.0"
-  xcodeVersion: "15.4"
 
 settings:
   base:
@@ -23,13 +22,7 @@ targets:
           NSCameraUsageDescription=$(PRODUCT_NAME) needs camera access so you can say your unlock phrase on camera.
           NSMicrophoneUsageDescription=$(PRODUCT_NAME) needs microphone access to hear your unlock phrase.
           NSSpeechRecognitionUsageDescription=$(PRODUCT_NAME) uses speech recognition to verify your unlock phrase.
-    entitlements:
-      path: VoiceGate/VoiceGate.entitlements
-      properties:
-        com.apple.developer.family-controls:
-          - true
-        com.apple.security.application-groups:
-          - group.com.voicegate.app
+        CODE_SIGN_ENTITLEMENTS: VoiceGate/VoiceGate.entitlements
     dependencies:
       - target: ShieldConfigurationExtension
       - target: ShieldActionExtension
@@ -44,13 +37,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app.ShieldConfiguration
-    entitlements:
-      path: Extensions/ShieldConfigurationExtension/ShieldConfigurationExtension.entitlements
-      properties:
-        com.apple.developer.family-controls:
-          - true
-        com.apple.security.application-groups:
-          - group.com.voicegate.app
+        CODE_SIGN_ENTITLEMENTS: Extensions/ShieldConfigurationExtension/ShieldConfigurationExtension.entitlements
     info:
       properties:
         NSExtension:
@@ -66,13 +53,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app.ShieldAction
-    entitlements:
-      path: Extensions/ShieldActionExtension/ShieldActionExtension.entitlements
-      properties:
-        com.apple.developer.family-controls:
-          - true
-        com.apple.security.application-groups:
-          - group.com.voicegate.app
+        CODE_SIGN_ENTITLEMENTS: Extensions/ShieldActionExtension/ShieldActionExtension.entitlements
     info:
       properties:
         NSExtension:
@@ -88,13 +69,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app.DeviceActivityMonitor
-    entitlements:
-      path: Extensions/DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements
-      properties:
-        com.apple.developer.family-controls:
-          - true
-        com.apple.security.application-groups:
-          - group.com.voicegate.app
+        CODE_SIGN_ENTITLEMENTS: Extensions/DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements
     info:
       properties:
         NSExtension:
