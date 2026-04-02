@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.voicegate
   deploymentTarget:
     iOS: "16.0"
+  generateEmptyDirectories: true
 
 settings:
   base:
@@ -13,15 +14,19 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: VoiceGate
-      - path: Shared
+      - VoiceGate
+      - Shared
+    info:
+      path: VoiceGate/Info.plist
+      properties:
+        CFBundleDisplayName: VoiceGate
+        UILaunchScreen: {}
+        NSCameraUsageDescription: "VoiceGate needs camera access so you can say your unlock phrase on camera."
+        NSMicrophoneUsageDescription: "VoiceGate needs microphone access to hear your unlock phrase."
+        NSSpeechRecognitionUsageDescription: "VoiceGate uses speech recognition to verify your unlock phrase."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app
-        INFOPLIST_VALUES: >-
-          NSCameraUsageDescription=$(PRODUCT_NAME) needs camera access so you can say your unlock phrase on camera.
-          NSMicrophoneUsageDescription=$(PRODUCT_NAME) needs microphone access to hear your unlock phrase.
-          NSSpeechRecognitionUsageDescription=$(PRODUCT_NAME) uses speech recognition to verify your unlock phrase.
         CODE_SIGN_ENTITLEMENTS: VoiceGate/VoiceGate.entitlements
     dependencies:
       - target: ShieldConfigurationExtension
@@ -32,46 +37,52 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - path: Extensions/ShieldConfigurationExtension
-      - path: Shared
+      - Extensions/ShieldConfigurationExtension
+      - Shared
+    info:
+      path: Extensions/ShieldConfigurationExtension/Info.plist
+      properties:
+        CFBundleDisplayName: ShieldConfigurationExtension
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldConfigurationExtension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app.ShieldConfiguration
         CODE_SIGN_ENTITLEMENTS: Extensions/ShieldConfigurationExtension/ShieldConfigurationExtension.entitlements
-    info:
-      properties:
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldConfigurationExtension
 
   ShieldActionExtension:
     type: app-extension
     platform: iOS
     sources:
-      - path: Extensions/ShieldActionExtension
-      - path: Shared
+      - Extensions/ShieldActionExtension
+      - Shared
+    info:
+      path: Extensions/ShieldActionExtension/Info.plist
+      properties:
+        CFBundleDisplayName: ShieldActionExtension
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettings.shield-action
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldActionExtension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app.ShieldAction
         CODE_SIGN_ENTITLEMENTS: Extensions/ShieldActionExtension/ShieldActionExtension.entitlements
-    info:
-      properties:
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.ManagedSettings.shield-action
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldActionExtension
 
   DeviceActivityMonitorExtension:
     type: app-extension
     platform: iOS
     sources:
-      - path: Extensions/DeviceActivityMonitorExtension
-      - path: Shared
+      - Extensions/DeviceActivityMonitorExtension
+      - Shared
+    info:
+      path: Extensions/DeviceActivityMonitorExtension/Info.plist
+      properties:
+        CFBundleDisplayName: DeviceActivityMonitorExtension
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.DeviceActivity.monitor
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).DeviceActivityMonitorExtension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app.DeviceActivityMonitor
         CODE_SIGN_ENTITLEMENTS: Extensions/DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements
-    info:
-      properties:
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.DeviceActivity.monitor
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).DeviceActivityMonitorExtension
