@@ -6,7 +6,7 @@ workflows:
     environment:
       vars:
         XCODE_SCHEME: "VoiceGate"
-      xcode: 15.4
+      xcode: latest
     scripts:
       - name: Set up Xcode project
         script: |
