@@ -1,0 +1,102 @@
+name: VoiceGate
+options:
+  bundleIdPrefix: com.voicegate
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.4"
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  VoiceGate:
+    type: application
+    platform: iOS
+    sources:
+      - path: VoiceGate
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app
+        INFOPLIST_VALUES: >-
+          NSCameraUsageDescription=$(PRODUCT_NAME) needs camera access so you can say your unlock phrase on camera.
+          NSMicrophoneUsageDescription=$(PRODUCT_NAME) needs microphone access to hear your unlock phrase.
+          NSSpeechRecognitionUsageDescription=$(PRODUCT_NAME) uses speech recognition to verify your unlock phrase.
+    entitlements:
+      path: VoiceGate/VoiceGate.entitlements
+      properties:
+        com.apple.developer.family-controls:
+          - true
+        com.apple.security.application-groups:
+          - group.com.voicegate.app
+    dependencies:
+      - target: ShieldConfigurationExtension
+      - target: ShieldActionExtension
+      - target: DeviceActivityMonitorExtension
+
+  ShieldConfigurationExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Extensions/ShieldConfigurationExtension
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app.ShieldConfiguration
+    entitlements:
+      path: Extensions/ShieldConfigurationExtension/ShieldConfigurationExtension.entitlements
+      properties:
+        com.apple.developer.family-controls:
+          - true
+        com.apple.security.application-groups:
+          - group.com.voicegate.app
+    info:
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldConfigurationExtension
+
+  ShieldActionExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Extensions/ShieldActionExtension
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app.ShieldAction
+    entitlements:
+      path: Extensions/ShieldActionExtension/ShieldActionExtension.entitlements
+      properties:
+        com.apple.developer.family-controls:
+          - true
+        com.apple.security.application-groups:
+          - group.com.voicegate.app
+    info:
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettings.shield-action
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldActionExtension
+
+  DeviceActivityMonitorExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Extensions/DeviceActivityMonitorExtension
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app.DeviceActivityMonitor
+    entitlements:
+      path: Extensions/DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements
+      properties:
+        com.apple.developer.family-controls:
+          - true
+        com.apple.security.application-groups:
+          - group.com.voicegate.app
+    info:
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.DeviceActivity.monitor
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).DeviceActivityMonitorExtension

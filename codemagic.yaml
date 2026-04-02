@@ -1,0 +1,43 @@
+workflows:
+  ios-voicegate:
+    name: VoiceGate iOS Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.voicegate.app
+      vars:
+        XCODE_WORKSPACE: "VoiceGate.xcworkspace"
+        XCODE_SCHEME: "VoiceGate"
+      xcode: 15.4
+      cocoapods: default
+    scripts:
+      - name: Set up Xcode project
+        script: |
+          # Since we don't have an .xcodeproj yet, we generate one with xcodegen
+          brew install xcodegen
+          xcodegen generate
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+      - name: Build iOS app
+        script: |
+          xcodebuild build \
+            -project VoiceGate.xcodeproj \
+            -scheme VoiceGate \
+            -destination 'generic/platform=iOS' \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      email:
+        recipients:
+          - armandasdourian@gmail.com
+        notify:
+          success: true
+          failure: true
