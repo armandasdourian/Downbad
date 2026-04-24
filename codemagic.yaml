@@ -1,6 +1,6 @@
 workflows:
   ios-voicegate:
-    name: VoiceGate iOS Build
+    name: VoiceGate iOS Build (Unsigned)
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -27,6 +27,54 @@ workflows:
     artifacts:
       - /tmp/xcodebuild.log
     publishing:
+      email:
+        recipients:
+          - armandasdourian@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  ios-voicegate-testflight:
+    name: VoiceGate TestFlight
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: voicegate_appstore
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.voicegate.app
+      vars:
+        XCODE_SCHEME: "VoiceGate"
+        APP_STORE_APP_ID: 6763621327
+      xcode: latest
+    scripts:
+      - name: Set up Xcode project
+        script: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Fetch signing files
+        script: |
+          xcode-project use-profiles
+      - name: Increment build number
+        script: |
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APP_ID" || echo "0")
+          cd $CM_BUILD_DIR
+          agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
+      - name: Build ipa
+        script: |
+          xcode-project build-ipa \
+            --project "VoiceGate.xcodeproj" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
       email:
         recipients:
           - armandasdourian@gmail.com
