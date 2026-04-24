@@ -18,7 +18,7 @@ struct HomeView: View {
                     appListView
                 }
             }
-            .navigationTitle("VoiceGate")
+            .navigationTitle("Downbad")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSettings = true } label: {
@@ -63,7 +63,7 @@ struct HomeView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(.blue)
 
-            Text("VoiceGate needs Screen Time access to block apps.")
+            Text("Downbad needs Screen Time access to block apps.")
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
 

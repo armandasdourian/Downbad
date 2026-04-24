@@ -6,7 +6,7 @@ import Foundation
 /// This extension runs as a separate process and survives app termination.
 class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
-    private let store = ManagedSettingsStore(named: .init("VoiceGateMain"))
+    private let store = ManagedSettingsStore(named: .init("DownbadMain"))
 
     /// Called when a monitored activity interval begins.
     /// We use this to re-apply shields (e.g., at the start of each day).

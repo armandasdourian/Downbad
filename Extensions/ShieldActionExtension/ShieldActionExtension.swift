@@ -53,14 +53,14 @@ class ShieldActionExtension: ShieldActionDelegate {
 
     private func scheduleUnlockNotification() {
         let content = UNMutableNotificationContent()
-        content.title = "VoiceGate"
+        content.title = "Downbad"
         content.body = "Tap here to unlock with your voice"
         content.sound = .default
         content.interruptionLevel = .timeSensitive
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
         let request = UNNotificationRequest(
-            identifier: "voicegate-unlock-\(UUID().uuidString)",
+            identifier: "downbad-unlock-\(UUID().uuidString)",
             content: content,
             trigger: trigger
         )

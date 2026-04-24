@@ -1,4 +1,4 @@
-# VoiceGate
+# Downbad
 
 An iOS app that locks you out of distracting apps. To unlock, you must say a specific phrase to your camera — adding a layer of social friction that makes you think twice.
 
@@ -8,7 +8,7 @@ An iOS app that locks you out of distracting apps. To unlock, you must say a spe
 2. **Set a phrase** for each app (e.g., "please unlock instagram I need it please")
 3. **Set an unlock duration** (5 min to rest of day — configurable per-app)
 4. When you try to open a blocked app, a **shield overlay** appears
-5. Tap "Unlock with Voice" → a notification opens VoiceGate
+5. Tap "Unlock with Voice" → a notification opens Downbad
 6. **Say the phrase to your camera** → speech recognition verifies it
 7. App unlocks for the configured duration, then re-locks automatically
 
@@ -23,12 +23,12 @@ An iOS app that locks you out of distracting apps. To unlock, you must say a spe
 ## Project Structure
 
 ```
-VoiceGate/
+Downbad/
 ├── Shared/
 │   └── SharedData.swift                 # Models, App Group storage, constants
-├── VoiceGate/
+├── Downbad/
 │   ├── App/
-│   │   └── VoiceGateApp.swift           # Entry point, notification + activity monitoring
+│   │   └── DownbadApp.swift           # Entry point, notification + activity monitoring
 │   ├── Models/
 │   │   ├── AppBlockManager.swift        # Shield/unshield logic via ManagedSettingsStore
 │   │   └── SpeechRecognitionManager.swift  # On-device speech-to-text + phrase matching
@@ -62,7 +62,7 @@ You need **Xcode on macOS** to build this project. The code can be written/edite
 #### 1. Create the Xcode Project
 1. Open Xcode → File → New → Project
 2. Choose **App** (iOS) → Next
-3. Product Name: `VoiceGate`
+3. Product Name: `Downbad`
 4. Team: Your Apple Developer account (paid, $99/year)
 5. Organization Identifier: `com.voicegate` (or your own)
 6. Interface: **SwiftUI**, Language: **Swift**
@@ -85,12 +85,12 @@ For each extension, go to File → New → Target:
 - Product Name: `DeviceActivityMonitorExtension`
 
 #### 3. Configure App Groups
-1. Select the **VoiceGate** target → Signing & Capabilities → + Capability → App Groups
+1. Select the **Downbad** target → Signing & Capabilities → + Capability → App Groups
 2. Add group: `group.com.voicegate.app`
 3. **Repeat for all 3 extension targets** — they must share the same App Group
 
 #### 4. Configure Family Controls
-1. Select the **VoiceGate** target → Signing & Capabilities → + Capability → Family Controls
+1. Select the **Downbad** target → Signing & Capabilities → + Capability → Family Controls
 2. **Repeat for all 3 extension targets**
 
 #### 5. Add Info.plist Keys
@@ -98,16 +98,16 @@ Add these to the **main app** target's Info.plist:
 
 ```xml
 <key>NSCameraUsageDescription</key>
-<string>VoiceGate needs camera access so you can say your unlock phrase on camera.</string>
+<string>Downbad needs camera access so you can say your unlock phrase on camera.</string>
 <key>NSMicrophoneUsageDescription</key>
-<string>VoiceGate needs microphone access to hear your unlock phrase.</string>
+<string>Downbad needs microphone access to hear your unlock phrase.</string>
 <key>NSSpeechRecognitionUsageDescription</key>
-<string>VoiceGate uses speech recognition to verify your unlock phrase.</string>
+<string>Downbad uses speech recognition to verify your unlock phrase.</string>
 ```
 
 #### 6. Copy Source Files
 1. Drag the `Shared/` folder into the Xcode project — add to **all targets**
-2. Drag `VoiceGate/` source files into the main app target
+2. Drag `Downbad/` source files into the main app target
 3. Replace the auto-generated extension `.swift` files with the ones from `Extensions/`
 
 #### 7. Build & Run
@@ -123,7 +123,7 @@ Add these to the **main app** target's Info.plist:
 | Camera | Show your face while saying the phrase |
 | Microphone | Capture your voice for speech recognition |
 | Speech Recognition | Convert speech to text for phrase matching |
-| Notifications | Alert you to open VoiceGate from the shield |
+| Notifications | Alert you to open Downbad from the shield |
 
 ## Known Limitations
 

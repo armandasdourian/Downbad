@@ -3,7 +3,7 @@ import UserNotifications
 import DeviceActivity
 
 @main
-struct VoiceGateApp: App {
+struct DownbadApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -74,11 +74,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 
         do {
             try center.startMonitoring(
-                DeviceActivityName("VoiceGate.Daily"),
+                DeviceActivityName("Downbad.Daily"),
                 during: schedule
             )
         } catch {
-            print("VoiceGate: Failed to start device activity monitoring: \(error)")
+            print("Downbad: Failed to start device activity monitoring: \(error)")
         }
     }
 }

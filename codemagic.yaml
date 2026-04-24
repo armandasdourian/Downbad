@@ -1,11 +1,11 @@
 workflows:
-  ios-voicegate:
-    name: VoiceGate iOS Build
+  ios-downbad:
+    name: Downbad iOS Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
       vars:
-        XCODE_SCHEME: "VoiceGate"
+        XCODE_SCHEME: "Downbad"
       xcode: latest
     scripts:
       - name: Set up Xcode project
@@ -15,8 +15,8 @@ workflows:
       - name: Build iOS app (no signing)
         script: |
           xcodebuild build \
-            -project VoiceGate.xcodeproj \
-            -scheme VoiceGate \
+            -project Downbad.xcodeproj \
+            -scheme Downbad \
             -destination 'generic/platform=iOS' \
             -configuration Debug \
             CODE_SIGN_IDENTITY="" \

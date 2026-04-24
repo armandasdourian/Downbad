@@ -8,7 +8,7 @@ import Combine
 final class AppBlockManager: ObservableObject {
     static let shared = AppBlockManager()
 
-    private let store = ManagedSettingsStore(named: .init("VoiceGateMain"))
+    private let store = ManagedSettingsStore(named: .init("DownbadMain"))
     private let center = AuthorizationCenter.shared
 
     @Published var isAuthorized = false

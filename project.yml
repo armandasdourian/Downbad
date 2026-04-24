@@ -1,4 +1,4 @@
-name: VoiceGate
+name: Downbad
 options:
   bundleIdPrefix: com.voicegate
   deploymentTarget:
@@ -10,24 +10,24 @@ settings:
     DEVELOPMENT_TEAM: ""
 
 targets:
-  VoiceGate:
+  Downbad:
     type: application
     platform: iOS
     sources:
-      - VoiceGate
+      - Downbad
       - Shared
     info:
-      path: VoiceGate/Info.plist
+      path: Downbad/Info.plist
       properties:
-        CFBundleDisplayName: VoiceGate
+        CFBundleDisplayName: Downbad
         UILaunchScreen: {}
-        NSCameraUsageDescription: "VoiceGate needs camera access so you can say your unlock phrase on camera."
-        NSMicrophoneUsageDescription: "VoiceGate needs microphone access to hear your unlock phrase."
-        NSSpeechRecognitionUsageDescription: "VoiceGate uses speech recognition to verify your unlock phrase."
+        NSCameraUsageDescription: "Downbad needs camera access so you can say your unlock phrase on camera."
+        NSMicrophoneUsageDescription: "Downbad needs microphone access to hear your unlock phrase."
+        NSSpeechRecognitionUsageDescription: "Downbad uses speech recognition to verify your unlock phrase."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app
-        CODE_SIGN_ENTITLEMENTS: VoiceGate/VoiceGate.entitlements
+        CODE_SIGN_ENTITLEMENTS: Downbad/Downbad.entitlements
     dependencies:
       - target: ShieldConfigurationExtension
       - target: ShieldActionExtension
