@@ -8,7 +8,8 @@ struct AddAppView: View {
     @State private var activitySelection = FamilyActivitySelection()
     @State private var showPicker = false
     @State private var displayName = ""
-    @State private var unlockPhrase = ""
+    @State private var selectedPreset: PhrasePreset = .pleadingShort
+    @State private var customPhrase = ""
     @State private var selectedDuration: UnlockDuration
 
     init() {
@@ -19,10 +20,17 @@ struct AddAppView: View {
         activitySelection.applicationTokens.first
     }
 
+    private var finalPhrase: String {
+        if selectedPreset == .custom {
+            return customPhrase.trimmingCharacters(in: .whitespaces)
+        }
+        return selectedPreset.render(for: displayName)?.trimmingCharacters(in: .whitespaces) ?? ""
+    }
+
     private var isValid: Bool {
-        selectedToken != nil &&
-        !displayName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !unlockPhrase.trimmingCharacters(in: .whitespaces).isEmpty
+        guard selectedToken != nil else { return false }
+        guard !displayName.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        return !finalPhrase.isEmpty
     }
 
     var body: some View {
@@ -58,13 +66,28 @@ struct AddAppView: View {
 
                 // MARK: Unlock Phrase
                 Section {
-                    TextField("e.g. please unlock instagram i need it please", text: $unlockPhrase)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    Picker("Phrase", selection: $selectedPreset) {
+                        ForEach(PhrasePreset.allCases) { preset in
+                            Text(preset.displayName).tag(preset)
+                        }
+                    }
+                    if selectedPreset == .custom {
+                        TextField("type your own awkward phrase", text: $customPhrase, axis: .vertical)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .lineLimit(2...4)
+                    }
                 } header: {
                     Text("Unlock Phrase")
                 } footer: {
-                    Text("You must say this exact phrase to your camera to unlock the app. Make it awkward enough that you'll think twice.")
+                    VStack(alignment: .leading, spacing: 6) {
+                        if !finalPhrase.isEmpty {
+                            Text("You'll say: \u{201C}\(finalPhrase)\u{201D}")
+                                .italic()
+                                .foregroundStyle(.primary)
+                        }
+                        Text("You must say this phrase to your camera to unlock the app. Make it awkward enough that you'll think twice.")
+                    }
                 }
 
                 // MARK: Duration
@@ -91,7 +114,7 @@ struct AddAppView: View {
                         guard let token = selectedToken else { return }
                         blockManager.addBlockedApp(
                             displayName: displayName.trimmingCharacters(in: .whitespaces),
-                            unlockPhrase: unlockPhrase.trimmingCharacters(in: .whitespaces),
+                            unlockPhrase: finalPhrase,
                             unlockDuration: selectedDuration,
                             token: token
                         )

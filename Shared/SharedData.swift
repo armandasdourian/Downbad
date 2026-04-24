@@ -48,6 +48,47 @@ enum UnlockDuration: Int, Codable, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Phrase Preset
+
+enum PhrasePreset: String, Codable, CaseIterable, Identifiable {
+    case pleadingShort
+    case pleadingLong
+    case embarrassingAdmit
+    case beggingRepeat
+    case desperateConfession
+    case custom
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .pleadingShort: return "Pleading (short)"
+        case .pleadingLong: return "Pleading (long)"
+        case .embarrassingAdmit: return "Embarrassing admission"
+        case .beggingRepeat: return "Begging repeat"
+        case .desperateConfession: return "Desperate confession"
+        case .custom: return "Custom phrase"
+        }
+    }
+
+    var template: String? {
+        switch self {
+        case .pleadingShort: return "please unlock {app} i really need it please"
+        case .pleadingLong: return "please unlock {app}, i really really need it, i promise i'll be quick, please please please"
+        case .embarrassingAdmit: return "i have no self control and i need {app} right now"
+        case .beggingRepeat: return "please please please please unlock {app}"
+        case .desperateConfession: return "i am so sorry for wanting {app} again, please unlock it, i'll hate myself later"
+        case .custom: return nil
+        }
+    }
+
+    func render(for appName: String) -> String? {
+        let trimmed = appName.trimmingCharacters(in: .whitespaces)
+        let name = trimmed.isEmpty ? "this app" : trimmed.lowercased()
+        return template?.replacingOccurrences(of: "{app}", with: name)
+    }
+}
+
 // MARK: - Blocked App Config
 
 struct BlockedAppConfig: Codable, Identifiable {
