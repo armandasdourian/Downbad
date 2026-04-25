@@ -144,10 +144,16 @@ struct UnlockView: View {
 
     private var successOverlay: some View {
         VStack(spacing: 24) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 80))
-                .foregroundStyle(.green)
-                .symbolEffect(.bounce, value: showSuccess)
+            if #available(iOS 17.0, *) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.green)
+                    .symbolEffect(.bounce, value: showSuccess)
+            } else {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.green)
+            }
 
             Text("\(appConfig.displayName) Unlocked!")
                 .font(.title.bold())

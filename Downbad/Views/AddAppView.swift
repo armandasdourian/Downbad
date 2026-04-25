@@ -1,5 +1,6 @@
 import SwiftUI
 import FamilyControls
+import ManagedSettings
 
 struct AddAppView: View {
     @Environment(\.dismiss) private var dismiss
