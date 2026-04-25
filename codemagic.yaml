@@ -41,6 +41,8 @@ workflows:
     integrations:
       app_store_connect: voicegate_appstore
     environment:
+      groups:
+        - ios_signing
       vars:
         XCODE_SCHEME: "Downbad"
         BUNDLE_ID: "com.voicegate.app"
@@ -54,9 +56,11 @@ workflows:
         script: |
           set -e
           keychain initialize
-          # Pull the persistent .p12 from Codemagic team signing identities
-          # into the build's keychain.
-          keychain add-certificates
+          # Decode the persistent .p12 from the secret env var and load into keychain
+          echo "$P12_BASE64" | base64 -d > /tmp/downbad_dev.p12
+          keychain add-certificates \
+            --certificate /tmp/downbad_dev.p12 \
+            --certificate-password "$P12_PASSWORD"
           # Create (or fetch) a dev provisioning profile for each bundle ID,
           # bound to the cert already loaded in the keychain.
           for ID in "$BUNDLE_ID" "$BUNDLE_ID.ShieldConfiguration" "$BUNDLE_ID.ShieldAction" "$BUNDLE_ID.DeviceActivityMonitor"; do
