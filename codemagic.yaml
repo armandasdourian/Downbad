@@ -53,6 +53,11 @@ workflows:
       - name: Set up code signing (dev profiles for all bundle IDs)
         script: |
           keychain initialize
+          # Create a new development certificate (with private key) — required
+          # before fetch-signing-files can issue profiles for a fresh account.
+          app-store-connect create-certificate \
+            --type DEVELOPMENT \
+            --save
           for ID in "$BUNDLE_ID" "$BUNDLE_ID.ShieldConfiguration" "$BUNDLE_ID.ShieldAction" "$BUNDLE_ID.DeviceActivityMonitor"; do
             app-store-connect fetch-signing-files "$ID" \
               --type IOS_APP_DEVELOPMENT \
