@@ -55,12 +55,27 @@ workflows:
           set -e
           keychain initialize
 
+          # Each CI build runs on a fresh VM, so the private key for any
+          # previously issued dev cert is gone. Revoke stale certs + profiles
+          # so we can issue fresh ones (Apple's 2-cert dev limit makes this
+          # non-optional once a cert exists).
+          EXISTING_CERTS=$(app-store-connect certificates list --certificate-type DEVELOPMENT --json 2>/dev/null | jq -r '.[]?.id // empty' || true)
+          for id in $EXISTING_CERTS; do
+            echo "Revoking stale dev cert: $id"
+            app-store-connect certificates delete "$id" || true
+          done
+          EXISTING_PROFILES=$(app-store-connect profiles list --profile-type IOS_APP_DEVELOPMENT --json 2>/dev/null | jq -r '.[]?.id // empty' || true)
+          for id in $EXISTING_PROFILES; do
+            echo "Deleting stale dev profile: $id"
+            app-store-connect profiles delete "$id" || true
+          done
+
           # Pre-generate a private key — Codemagic CLI's certificates create
           # needs an explicit key path; it does not auto-generate.
           CERT_KEY=/tmp/dev_cert_key.pem
           openssl genrsa -out "$CERT_KEY" 2048
 
-          # Create a dev certificate in App Store Connect bound to the key
+          # Create a fresh dev certificate bound to the key
           app-store-connect certificates create \
             --type DEVELOPMENT \
             --certificate-key "@file:$CERT_KEY" \
