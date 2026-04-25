@@ -61,6 +61,10 @@ workflows:
             --certificate /tmp/downbad_dev.p12 \
             --certificate-password "$P12_PASSWORD"
           security find-identity -v -p codesigning
+          # APP_STORE_CONNECT_PRIVATE_KEY is the .p8 content; xcodebuild needs a file path.
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$APP_STORE_CONNECT_PRIVATE_KEY" > "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8"
+          ls -la "$HOME/.appstoreconnect/private_keys/"
       - name: Build dev-signed .ipa
         script: |
           set -o pipefail
@@ -78,7 +82,7 @@ workflows:
             -allowProvisioningUpdates \
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -authenticationKeyPath "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8" \
             DEVELOPMENT_TEAM="Q32TFF7K3U" \
             COMPILER_INDEX_STORE_ENABLE=NO \
             2>&1 | tee /tmp/xcodebuild.log
@@ -103,7 +107,7 @@ workflows:
             -allowProvisioningUpdates \
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -authenticationKeyPath "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8" \
             2>&1 | tee -a /tmp/xcodebuild.log
       - name: Collect xcodebuild logs on failure
         when:
