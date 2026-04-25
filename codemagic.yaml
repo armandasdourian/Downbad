@@ -87,11 +87,26 @@ workflows:
         when:
           condition: failure
         script: |
-          mkdir -p /tmp/full_logs
-          cp /tmp/xcodebuild.log /tmp/full_logs/ 2>/dev/null || true
-          find ~/Library/Developer/Xcode/DerivedData -name "*.xcactivitylog" -exec cp {} /tmp/full_logs/ \; 2>/dev/null || true
-          find /Users/builder/clone/build -name "*.log" -exec cp {} /tmp/full_logs/ \; 2>/dev/null || true
-          ls -la /tmp/full_logs/ || true
+          echo "===== /tmp/xcodebuild.log (last 300 lines) ====="
+          tail -n 300 /tmp/xcodebuild.log 2>/dev/null || echo "no /tmp/xcodebuild.log"
+          echo ""
+          echo "===== Codemagic xcode-project build log ====="
+          find /Users/builder/Library/Logs -name "*.log" -mmin -10 2>/dev/null | while read f; do
+            echo "--- $f ---"
+            tail -n 200 "$f"
+          done
+          echo ""
+          echo "===== xcactivitylog (decoded) ====="
+          find ~/Library/Developer/Xcode/DerivedData -name "*.xcactivitylog" -mmin -10 2>/dev/null | head -3 | while read f; do
+            echo "--- $f ---"
+            gunzip -c "$f" 2>/dev/null | strings | grep -E "error:|warning:|FAILED|Code Sign|Provisioning" | tail -n 60 || true
+          done
+          echo ""
+          echo "===== build/ios logs ====="
+          find /Users/builder/clone/build -name "*.log" 2>/dev/null | while read f; do
+            echo "--- $f ---"
+            tail -n 100 "$f"
+          done
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild.log
