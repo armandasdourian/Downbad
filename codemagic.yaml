@@ -61,8 +61,8 @@ workflows:
           # via --certificate-key (PEM/OpenSSH, NOT pkcs12). The keychain has the .p12
           # itself; the PEM is a separate handoff for the App Store Connect API call.
           openssl pkcs12 -in /tmp/downbad_dev.p12 -nocerts -nodes \
-            -passin "pass:$P12_PASSWORD" -legacy \
-            -out /tmp/downbad_dev_key.pem
+            -passin "pass:$P12_PASSWORD" -legacy | \
+            sed -n '/-----BEGIN/,$p' > /tmp/downbad_dev_key.pem
           keychain add-certificates \
             --certificate /tmp/downbad_dev.p12 \
             --certificate-password "$P12_PASSWORD"
