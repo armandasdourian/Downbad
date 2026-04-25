@@ -63,7 +63,7 @@ workflows:
           # Create a dev certificate in App Store Connect bound to the key
           app-store-connect certificates create \
             --type DEVELOPMENT \
-            --certificate-key-path "$CERT_KEY" \
+            --certificate-key "@file:$CERT_KEY" \
             --save
 
           # Fetch/create profiles for each bundle ID, signing with the new cert
@@ -71,7 +71,7 @@ workflows:
             app-store-connect fetch-signing-files "$ID" \
               --platform IOS \
               --type IOS_APP_DEVELOPMENT \
-              --certificate-key-path "$CERT_KEY" \
+              --certificate-key "@file:$CERT_KEY" \
               --create
           done
 
