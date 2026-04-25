@@ -41,57 +41,17 @@ workflows:
     integrations:
       app_store_connect: voicegate_appstore
     environment:
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.voicegate.app
       vars:
         XCODE_SCHEME: "Downbad"
-        BUNDLE_ID: "com.voicegate.app"
       xcode: latest
     scripts:
       - name: Set up Xcode project
         script: |
           brew install xcodegen
           xcodegen generate
-      - name: Set up code signing (dev profiles for all bundle IDs)
-        script: |
-          set -e
-          keychain initialize
-
-          # Each CI build runs on a fresh VM, so the private key for any
-          # previously issued dev cert is gone. Revoke stale certs + profiles
-          # so we can issue fresh ones (Apple's 2-cert dev limit makes this
-          # non-optional once a cert exists).
-          EXISTING_CERTS=$(app-store-connect certificates list --certificate-type DEVELOPMENT --json 2>/dev/null | jq -r '.[]?.id // empty' || true)
-          for id in $EXISTING_CERTS; do
-            echo "Revoking stale dev cert: $id"
-            app-store-connect certificates delete "$id" || true
-          done
-          EXISTING_PROFILES=$(app-store-connect profiles list --profile-type IOS_APP_DEVELOPMENT --json 2>/dev/null | jq -r '.[]?.id // empty' || true)
-          for id in $EXISTING_PROFILES; do
-            echo "Deleting stale dev profile: $id"
-            app-store-connect profiles delete "$id" || true
-          done
-
-          # Pre-generate a private key — Codemagic CLI's certificates create
-          # needs an explicit key path; it does not auto-generate.
-          CERT_KEY=/tmp/dev_cert_key.pem
-          openssl genrsa -out "$CERT_KEY" 2048
-
-          # Create a fresh dev certificate bound to the key
-          app-store-connect certificates create \
-            --type DEVELOPMENT \
-            --certificate-key "@file:$CERT_KEY" \
-            --save
-
-          # Fetch/create profiles for each bundle ID, signing with the new cert
-          for ID in "$BUNDLE_ID" "$BUNDLE_ID.ShieldConfiguration" "$BUNDLE_ID.ShieldAction" "$BUNDLE_ID.DeviceActivityMonitor"; do
-            app-store-connect fetch-signing-files "$ID" \
-              --platform IOS \
-              --type IOS_APP_DEVELOPMENT \
-              --certificate-key "@file:$CERT_KEY" \
-              --create
-          done
-
-          keychain add-certificates
-          xcode-project use-profiles
       - name: Build dev-signed .ipa
         script: |
           set -o pipefail
