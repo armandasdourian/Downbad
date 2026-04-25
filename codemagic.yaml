@@ -61,15 +61,11 @@ workflows:
             --certificate /tmp/downbad_dev.p12 \
             --certificate-password "$P12_PASSWORD"
           security find-identity -v -p codesigning
-          # APP_STORE_CONNECT_PRIVATE_KEY is the .p8 content; xcodebuild needs a file path.
-          # Use printf '%s' (not echo) to preserve embedded newlines in the PEM content.
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          P8_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8"
-          printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$P8_PATH"
-          ls -la "$HOME/.appstoreconnect/private_keys/"
-          echo "p8 first line: $(head -1 "$P8_PATH")"
-          echo "p8 last line: $(tail -1 "$P8_PATH")"
-          echo "p8 line count: $(wc -l < "$P8_PATH")"
+          # Codemagic's app_store_connect integration already wrote the .p8 file to
+          # ~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8. The
+          # APP_STORE_CONNECT_PRIVATE_KEY env var is just a "@file:..." reference
+          # to that path, not the key content itself.
+          ls -la "$HOME/.appstoreconnect/private_keys/" || true
       - name: Build dev-signed .ipa
         script: |
           set -o pipefail
