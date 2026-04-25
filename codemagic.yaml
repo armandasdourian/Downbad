@@ -78,11 +78,35 @@ workflows:
       - name: Build dev-signed .ipa
         script: |
           set -o pipefail
-          xcode-project build-ipa \
-            --project "Downbad.xcodeproj" \
-            --scheme "$XCODE_SCHEME" \
-            --verbose \
+          # Use raw xcodebuild so stderr (the actual error) is visible inline
+          # instead of being swallowed by the Codemagic CLI wrapper.
+          mkdir -p build/ios/xcarchive build/ios/ipa
+          xcodebuild archive \
+            -project "Downbad.xcodeproj" \
+            -scheme "$XCODE_SCHEME" \
+            -archivePath "build/ios/xcarchive/Downbad.xcarchive" \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="Q32TFF7K3U" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             2>&1 | tee /tmp/xcodebuild.log
+          cat > /tmp/ExportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>development</string>
+            <key>teamID</key><string>Q32TFF7K3U</string>
+            <key>signingStyle</key><string>manual</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "build/ios/xcarchive/Downbad.xcarchive" \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportPath "build/ios/ipa" \
+            2>&1 | tee -a /tmp/xcodebuild.log
       - name: Collect xcodebuild logs on failure
         when:
           condition: failure
