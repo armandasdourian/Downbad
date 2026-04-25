@@ -52,17 +52,29 @@ workflows:
           xcodegen generate
       - name: Set up code signing (dev profiles for all bundle IDs)
         script: |
+          set -e
           keychain initialize
-          # Create a new development certificate (with private key) — required
-          # before fetch-signing-files can issue profiles for a fresh account.
-          app-store-connect create-certificate \
+
+          # Pre-generate a private key — Codemagic CLI's certificates create
+          # needs an explicit key path; it does not auto-generate.
+          CERT_KEY=/tmp/dev_cert_key.pem
+          openssl genrsa -out "$CERT_KEY" 2048
+
+          # Create a dev certificate in App Store Connect bound to the key
+          app-store-connect certificates create \
             --type DEVELOPMENT \
+            --certificate-key-path "$CERT_KEY" \
             --save
+
+          # Fetch/create profiles for each bundle ID, signing with the new cert
           for ID in "$BUNDLE_ID" "$BUNDLE_ID.ShieldConfiguration" "$BUNDLE_ID.ShieldAction" "$BUNDLE_ID.DeviceActivityMonitor"; do
             app-store-connect fetch-signing-files "$ID" \
+              --platform IOS \
               --type IOS_APP_DEVELOPMENT \
+              --certificate-key-path "$CERT_KEY" \
               --create
           done
+
           keychain add-certificates
           xcode-project use-profiles
       - name: Build dev-signed .ipa
