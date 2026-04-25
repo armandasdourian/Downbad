@@ -57,7 +57,15 @@ workflows:
           set -e
           keychain initialize
           # Decode the persistent .p12 from the secret env var and load into keychain
+          echo "P12_BASE64 length: ${#P12_BASE64}"
+          echo "P12_PASSWORD length: ${#P12_PASSWORD}"
           echo "$P12_BASE64" | base64 -d > /tmp/downbad_dev.p12
+          ls -la /tmp/downbad_dev.p12
+          # Verify the .p12 is parseable with the password before handing to Codemagic CLI
+          openssl pkcs12 -in /tmp/downbad_dev.p12 -info -nokeys -nocerts -passin "pass:$P12_PASSWORD" -legacy 2>&1 | head -10 || echo "openssl info failed"
+          openssl pkcs12 -in /tmp/downbad_dev.p12 -nokeys -passin "pass:$P12_PASSWORD" -legacy >/tmp/key_check.pem 2>&1 && \
+            echo "Key extraction OK: $(grep -c 'PRIVATE KEY' /tmp/key_check.pem) PRIVATE KEY markers" || \
+            echo "Key extraction FAILED: $(cat /tmp/key_check.pem | head -3)"
           keychain add-certificates \
             --certificate /tmp/downbad_dev.p12 \
             --certificate-password "$P12_PASSWORD"
