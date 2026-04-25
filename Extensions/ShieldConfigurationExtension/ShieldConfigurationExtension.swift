@@ -6,6 +6,7 @@ import UIKit
 class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
     override func configuration(shielding application: Application) -> ShieldConfiguration {
+        SharedDefaults.shared.recordShieldConfig()
         let appName = application.localizedDisplayName ?? "This app"
 
         return ShieldConfiguration(
@@ -37,7 +38,8 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     }
 
     override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration {
-        ShieldConfiguration(
+        SharedDefaults.shared.recordShieldConfig()
+        return ShieldConfiguration(
             backgroundBlurStyle: .systemThickMaterialDark,
             backgroundColor: UIColor.black.withAlphaComponent(0.85),
             icon: UIImage(systemName: "lock.fill"),

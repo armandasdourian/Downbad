@@ -12,6 +12,10 @@ enum StorageKeys {
     static let blockedApps = "blockedApps"
     static let defaultUnlockDuration = "defaultUnlockDuration"
     static let pendingUnlockAppID = "pendingUnlockAppID"
+    static let shieldConfigInvocations = "diag.shieldConfigInvocations"
+    static let shieldConfigLastAt = "diag.shieldConfigLastAt"
+    static let shieldButtonTaps = "diag.shieldButtonTaps"
+    static let shieldButtonLastAt = "diag.shieldButtonLastAt"
 }
 
 // MARK: - Unlock Duration
@@ -182,6 +186,38 @@ final class SharedDefaults {
 
     func findApp(byTokenData data: Data) -> BlockedAppConfig? {
         blockedApps.first { $0.tokenData == data }
+    }
+
+    // MARK: Diagnostics
+
+    var shieldConfigInvocations: Int {
+        get { defaults.integer(forKey: StorageKeys.shieldConfigInvocations) }
+        set { defaults.set(newValue, forKey: StorageKeys.shieldConfigInvocations) }
+    }
+
+    var shieldConfigLastAt: Date? {
+        get { defaults.object(forKey: StorageKeys.shieldConfigLastAt) as? Date }
+        set { defaults.set(newValue, forKey: StorageKeys.shieldConfigLastAt) }
+    }
+
+    var shieldButtonTaps: Int {
+        get { defaults.integer(forKey: StorageKeys.shieldButtonTaps) }
+        set { defaults.set(newValue, forKey: StorageKeys.shieldButtonTaps) }
+    }
+
+    var shieldButtonLastAt: Date? {
+        get { defaults.object(forKey: StorageKeys.shieldButtonLastAt) as? Date }
+        set { defaults.set(newValue, forKey: StorageKeys.shieldButtonLastAt) }
+    }
+
+    func recordShieldConfig() {
+        shieldConfigInvocations += 1
+        shieldConfigLastAt = .now
+    }
+
+    func recordShieldButtonTap() {
+        shieldButtonTaps += 1
+        shieldButtonLastAt = .now
     }
 
     /// Re-lock any apps whose unlock has expired.

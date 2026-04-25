@@ -13,6 +13,7 @@ class ShieldActionExtension: ShieldActionDelegate {
     ) {
         switch action {
         case .primaryButtonPressed:
+            SharedDefaults.shared.recordShieldButtonTap()
             // Find the matching app config and store its ID for the main app to read
             if let tokenData = try? JSONEncoder().encode(application),
                let appConfig = SharedDefaults.shared.findApp(byTokenData: tokenData) {
