@@ -88,9 +88,15 @@ workflows:
             -destination 'generic/platform=iOS' \
             -configuration Release \
             CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Development" \
             DEVELOPMENT_TEAM="Q32TFF7K3U" \
             COMPILER_INDEX_STORE_ENABLE=NO \
             2>&1 | tee /tmp/xcodebuild.log
+          # Fail loudly if archive produced unsigned binaries
+          if grep -q "isn't code signed" /tmp/xcodebuild.log; then
+            echo "ERROR: archive succeeded but binaries are unsigned" >&2
+            exit 1
+          fi
           cat > /tmp/ExportOptions.plist <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
