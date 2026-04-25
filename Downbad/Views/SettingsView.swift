@@ -40,7 +40,7 @@ struct SettingsView: View {
                 Section("About") {
                     LabeledContent("Version", value: "1.0.0")
                     LabeledContent("How it works") {
-                        Text("VoiceGate uses Screen Time to block apps. To unlock, say the phrase you set to your camera.")
+                        Text("Downbad uses Screen Time to block apps. To unlock, say the phrase you set to your camera.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

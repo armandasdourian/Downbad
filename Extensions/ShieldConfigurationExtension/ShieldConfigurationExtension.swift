@@ -17,7 +17,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
                 color: .white
             ),
             subtitle: ShieldConfiguration.Label(
-                text: "Open VoiceGate to say your unlock phrase",
+                text: "Open Downbad to say your unlock phrase",
                 color: .lightGray
             ),
             primaryButtonLabel: ShieldConfiguration.Label(
@@ -46,7 +46,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
                 color: .white
             ),
             subtitle: ShieldConfiguration.Label(
-                text: "Open VoiceGate to say your unlock phrase",
+                text: "Open Downbad to say your unlock phrase",
                 color: .lightGray
             ),
             primaryButtonLabel: ShieldConfiguration.Label(
