@@ -56,39 +56,22 @@ workflows:
         script: |
           set -e
           keychain initialize
-          # Decode the persistent .p12 from the secret env var and load into keychain
-          echo "P12_BASE64 length: ${#P12_BASE64}"
-          echo "P12_PASSWORD length: ${#P12_PASSWORD}"
           echo "$P12_BASE64" | base64 -d > /tmp/downbad_dev.p12
-          ls -la /tmp/downbad_dev.p12
-          # Verify the .p12 is parseable with the password before handing to Codemagic CLI
-          openssl pkcs12 -in /tmp/downbad_dev.p12 -info -nokeys -nocerts -passin "pass:$P12_PASSWORD" -legacy 2>&1 | head -10 || echo "openssl info failed"
-          openssl pkcs12 -in /tmp/downbad_dev.p12 -nocerts -passin "pass:$P12_PASSWORD" -legacy -passout "pass:throwaway" >/tmp/key_check.pem 2>&1 && \
-            echo "Key extraction OK: $(grep -c 'PRIVATE KEY' /tmp/key_check.pem) PRIVATE KEY markers" || \
-            echo "Key extraction FAILED: $(head -3 /tmp/key_check.pem)"
-          # Same code path Codemagic CLI uses
-          python3 -c "
-          from cryptography.hazmat.primitives.serialization import pkcs12
-          import os
-          with open('/tmp/downbad_dev.p12','rb') as f: data = f.read()
-          pwd = os.environ['P12_PASSWORD'].encode()
-          print(f'cryptography: data={len(data)} bytes, pwd_len={len(pwd)}')
-          try:
-              key, cert, addl = pkcs12.load_key_and_certificates(data, pwd)
-              print(f'cryptography: key={type(key).__name__ if key else None}')
-              print(f'cryptography: cert={cert.subject.rfc4514_string() if cert else None}')
-          except Exception as e:
-              print(f'cryptography: ERROR {type(e).__name__}: {e}')
-          "
+          # Extract the PEM private key from the .p12 — fetch-signing-files requires it
+          # via --certificate-key (PEM/OpenSSH, NOT pkcs12). The keychain has the .p12
+          # itself; the PEM is a separate handoff for the App Store Connect API call.
+          openssl pkcs12 -in /tmp/downbad_dev.p12 -nocerts -nodes \
+            -passin "pass:$P12_PASSWORD" -legacy \
+            -out /tmp/downbad_dev_key.pem
           keychain add-certificates \
             --certificate /tmp/downbad_dev.p12 \
             --certificate-password "$P12_PASSWORD"
-          # Create (or fetch) a dev provisioning profile for each bundle ID,
-          # bound to the cert already loaded in the keychain.
+          # Create (or fetch) a dev provisioning profile for each bundle ID
           for ID in "$BUNDLE_ID" "$BUNDLE_ID.ShieldConfiguration" "$BUNDLE_ID.ShieldAction" "$BUNDLE_ID.DeviceActivityMonitor"; do
             app-store-connect fetch-signing-files "$ID" \
               --platform IOS \
               --type IOS_APP_DEVELOPMENT \
+              --certificate-key=@file:/tmp/downbad_dev_key.pem \
               --create
           done
           xcode-project use-profiles
