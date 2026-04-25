@@ -41,19 +41,25 @@ workflows:
     integrations:
       app_store_connect: voicegate_appstore
     environment:
-      ios_signing:
-        distribution_type: development
-        bundle_identifier: com.voicegate.app
       vars:
         XCODE_SCHEME: "Downbad"
+        BUNDLE_ID: "com.voicegate.app"
       xcode: latest
     scripts:
       - name: Set up Xcode project
         script: |
           brew install xcodegen
           xcodegen generate
-      - name: Fetch development signing files
-        script: xcode-project use-profiles
+      - name: Set up code signing (dev profiles for all bundle IDs)
+        script: |
+          keychain initialize
+          for ID in "$BUNDLE_ID" "$BUNDLE_ID.ShieldConfiguration" "$BUNDLE_ID.ShieldAction" "$BUNDLE_ID.DeviceActivityMonitor"; do
+            app-store-connect fetch-signing-files "$ID" \
+              --type IOS_APP_DEVELOPMENT \
+              --create
+          done
+          keychain add-certificates
+          xcode-project use-profiles
       - name: Build dev-signed .ipa
         script: |
           xcode-project build-ipa \
