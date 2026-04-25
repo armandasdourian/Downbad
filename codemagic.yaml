@@ -57,42 +57,31 @@ workflows:
           set -e
           keychain initialize
           echo "$P12_BASE64" | base64 -d > /tmp/downbad_dev.p12
-          # Extract the PEM private key from the .p12 — fetch-signing-files requires it
-          # via --certificate-key (PEM/OpenSSH, NOT pkcs12). The keychain has the .p12
-          # itself; the PEM is a separate handoff for the App Store Connect API call.
-          openssl pkcs12 -in /tmp/downbad_dev.p12 -nocerts -nodes \
-            -passin "pass:$P12_PASSWORD" -legacy | \
-            sed -n '/-----BEGIN/,$p' > /tmp/downbad_dev_key.pem
           keychain add-certificates \
             --certificate /tmp/downbad_dev.p12 \
             --certificate-password "$P12_PASSWORD"
-          # Create (or fetch) a dev provisioning profile for each bundle ID
-          for ID in "$BUNDLE_ID" "$BUNDLE_ID.ShieldConfiguration" "$BUNDLE_ID.ShieldAction" "$BUNDLE_ID.DeviceActivityMonitor"; do
-            app-store-connect fetch-signing-files "$ID" \
-              --platform IOS \
-              --type IOS_APP_DEVELOPMENT \
-              --certificate-key=@file:/tmp/downbad_dev_key.pem \
-              --create
-          done
-          xcode-project use-profiles
+          security find-identity -v -p codesigning
       - name: Build dev-signed .ipa
         script: |
           set -o pipefail
-          # Use raw xcodebuild so stderr (the actual error) is visible inline
-          # instead of being swallowed by the Codemagic CLI wrapper.
           mkdir -p build/ios/xcarchive build/ios/ipa
+          # Use -allowProvisioningUpdates with the App Store Connect API key so xcodebuild
+          # fetches/creates profiles tied to the cert already in the keychain.
+          # Avoids the brittleness of separate fetch-signing-files runs that produced
+          # profiles bound to different certs.
           xcodebuild archive \
             -project "Downbad.xcodeproj" \
             -scheme "$XCODE_SCHEME" \
             -archivePath "build/ios/xcarchive/Downbad.xcarchive" \
             -destination 'generic/platform=iOS' \
             -configuration Release \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Development" \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            -authenticationKeyPath "$APP_STORE_CONNECT_PRIVATE_KEY" \
             DEVELOPMENT_TEAM="Q32TFF7K3U" \
             COMPILER_INDEX_STORE_ENABLE=NO \
             2>&1 | tee /tmp/xcodebuild.log
-          # Fail loudly if archive produced unsigned binaries
           if grep -q "isn't code signed" /tmp/xcodebuild.log; then
             echo "ERROR: archive succeeded but binaries are unsigned" >&2
             exit 1
@@ -104,7 +93,6 @@ workflows:
           <dict>
             <key>method</key><string>development</string>
             <key>teamID</key><string>Q32TFF7K3U</string>
-            <key>signingStyle</key><string>manual</string>
           </dict>
           </plist>
           EOF
@@ -112,6 +100,10 @@ workflows:
             -archivePath "build/ios/xcarchive/Downbad.xcarchive" \
             -exportOptionsPlist /tmp/ExportOptions.plist \
             -exportPath "build/ios/ipa" \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            -authenticationKeyPath "$APP_STORE_CONNECT_PRIVATE_KEY" \
             2>&1 | tee -a /tmp/xcodebuild.log
       - name: Collect xcodebuild logs on failure
         when:
