@@ -33,3 +33,40 @@ workflows:
         notify:
           success: true
           failure: true
+
+  ios-downbad-dev:
+    name: Downbad Dev (signed for installed devices)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: voicegate_appstore
+    environment:
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.voicegate.app
+      vars:
+        XCODE_SCHEME: "Downbad"
+      xcode: latest
+    scripts:
+      - name: Set up Xcode project
+        script: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Fetch development signing files
+        script: xcode-project use-profiles
+      - name: Build dev-signed .ipa
+        script: |
+          xcode-project build-ipa \
+            --project "Downbad.xcodeproj" \
+            --scheme "$XCODE_SCHEME" \
+            | tee /tmp/xcodebuild.log
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild.log
+    publishing:
+      email:
+        recipients:
+          - armandasdourian@gmail.com
+        notify:
+          success: true
+          failure: true
