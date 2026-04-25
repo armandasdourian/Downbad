@@ -79,13 +79,25 @@ workflows:
           xcode-project use-profiles
       - name: Build dev-signed .ipa
         script: |
+          set -o pipefail
           xcode-project build-ipa \
             --project "Downbad.xcodeproj" \
             --scheme "$XCODE_SCHEME" \
-            | tee /tmp/xcodebuild.log
+            --verbose \
+            2>&1 | tee /tmp/xcodebuild.log
+      - name: Collect xcodebuild logs on failure
+        when:
+          condition: failure
+        script: |
+          mkdir -p /tmp/full_logs
+          cp /tmp/xcodebuild.log /tmp/full_logs/ 2>/dev/null || true
+          find ~/Library/Developer/Xcode/DerivedData -name "*.xcactivitylog" -exec cp {} /tmp/full_logs/ \; 2>/dev/null || true
+          find /Users/builder/clone/build -name "*.log" -exec cp {} /tmp/full_logs/ \; 2>/dev/null || true
+          ls -la /tmp/full_logs/ || true
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild.log
+      - /tmp/full_logs/*
     publishing:
       email:
         recipients:
