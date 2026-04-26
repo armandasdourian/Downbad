@@ -157,8 +157,6 @@ workflows:
           app_id: $FIREBASE_APP_ID
           groups:
             - testers
-          release_notes: |
-            Build #$PROJECT_BUILD_NUMBER
       email:
         recipients:
           - armandasdourian@gmail.com
