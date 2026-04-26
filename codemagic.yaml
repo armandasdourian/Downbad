@@ -38,6 +38,13 @@ workflows:
     name: Downbad Dev (signed for installed devices)
     max_build_duration: 60
     instance_type: mac_mini_m2
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: master
+          include: true
+          source: true
     integrations:
       app_store_connect: voicegate_appstore
     environment:
