@@ -50,6 +50,7 @@ workflows:
     environment:
       groups:
         - ios_signing
+        - firebase
       vars:
         XCODE_SCHEME: "Downbad"
         BUNDLE_ID: "com.voicegate.app"
@@ -150,6 +151,14 @@ workflows:
       - /tmp/xcodebuild.log
       - /tmp/full_logs/*
     publishing:
+      firebase:
+        firebase_service_account: $FIREBASE_SERVICE_ACCOUNT
+        ios:
+          app_id: $FIREBASE_APP_ID
+          groups:
+            - testers
+          release_notes: |
+            Build #$PROJECT_BUILD_NUMBER
       email:
         recipients:
           - armandasdourian@gmail.com
