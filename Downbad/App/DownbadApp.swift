@@ -6,9 +6,23 @@ import DeviceActivity
 struct DownbadApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    @State private var hasOnboarded = SharedDefaults.shared.hasOnboarded
+
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            Group {
+                if hasOnboarded {
+                    HomeView()
+                } else {
+                    OnboardingView {
+                        // SharedDefaults.shared.hasOnboarded set by onboarding itself.
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            hasOnboarded = true
+                        }
+                    }
+                }
+            }
+            .preferredColorScheme(.light) // cream paper aesthetic — keep light
         }
     }
 }
@@ -21,10 +35,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Request notification permissions
-        let center = UNUserNotificationCenter.current()
-        center.delegate = self
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+        UNUserNotificationCenter.current().delegate = self
 
         // Start daily device activity monitoring so the extension can re-shield
         // apps even if the main app is killed.

@@ -1,4 +1,119 @@
 workflows:
+  # ──────────────────────────────────────────────────────────────────────
+  # Preview screenshots — boots an iOS Simulator on the Mac runner, builds
+  # the app unsigned, takes 2 screenshots (onboarding step 0 + home/auth
+  # recovery state), emails them to you.
+  #
+  # Use case: you don't have a Mac. Push a branch named feature/* and
+  # within ~5min you get an email with screenshots.
+  #
+  # Limitations:
+  # - Family Controls APIs don't function in iOS Simulator. The Home view
+  #   will render the "we lost screen time access" recovery state since
+  #   AuthorizationCenter never reaches .approved in CI.
+  # - Camera + speech recognition won't work in the simulator either, so
+  #   the unlock screen won't be reachable here.
+  # - For pixel-perfect QA of the UnlockView, the only path is a real
+  #   device or MacInCloud + manual run.
+  ios-downbad-preview:
+    name: Downbad Preview Screenshots
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'feature/*'
+          include: true
+          source: true
+        - pattern: 'design/*'
+          include: true
+          source: true
+        - pattern: 'preview/*'
+          include: true
+          source: true
+    environment:
+      vars:
+        XCODE_SCHEME: "Downbad"
+        SIM_DEVICE: "iPhone 15 Pro"
+        BUNDLE_ID: "com.voicegate.app"
+        APP_GROUP: "group.com.voicegate.app"
+      xcode: latest
+    scripts:
+      - name: Set up Xcode project
+        script: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Build for simulator
+        script: |
+          set -o pipefail
+          xcodebuild build \
+            -project Downbad.xcodeproj \
+            -scheme "$XCODE_SCHEME" \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,name=$SIM_DEVICE" \
+            -configuration Debug \
+            -derivedDataPath ./DerivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 | tee /tmp/xcodebuild.log
+      - name: Boot simulator + install app
+        script: |
+          set -e
+          APP_PATH=$(find ./DerivedData/Build/Products/Debug-iphonesimulator -name "Downbad.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Could not find Downbad.app in DerivedData"
+            find ./DerivedData -name "*.app" -type d
+            exit 1
+          fi
+          echo "App: $APP_PATH"
+
+          # Find or boot the device
+          SIM_ID=$(xcrun simctl list devices "$SIM_DEVICE" available | grep -oE '\(([A-F0-9-]{36})\)' | head -1 | tr -d '()')
+          if [ -z "$SIM_ID" ]; then
+            echo "Could not find $SIM_DEVICE in available simulators"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Simulator: $SIM_ID"
+          xcrun simctl boot "$SIM_ID" || true   # already-booted is fine
+          xcrun simctl install "$SIM_ID" "$APP_PATH"
+          echo "$SIM_ID" > /tmp/sim_id
+      - name: Capture screenshots
+        script: |
+          set -e
+          SIM_ID=$(cat /tmp/sim_id)
+          mkdir -p screenshots
+
+          # 1. Fresh launch — should land on onboarding step 0 (welcome / judge letterhead)
+          xcrun simctl launch "$SIM_ID" "$BUNDLE_ID"
+          sleep 5
+          xcrun simctl io "$SIM_ID" screenshot screenshots/01-onboarding-welcome.png
+          echo "✓ 01-onboarding-welcome.png"
+
+          # 2. Skip onboarding (toggle hasOnboarded in app-group defaults), re-launch — home with auth-recovery
+          xcrun simctl terminate "$SIM_ID" "$BUNDLE_ID"
+          xcrun simctl spawn "$SIM_ID" defaults write "$APP_GROUP" hasOnboarded -bool true
+          xcrun simctl launch "$SIM_ID" "$BUNDLE_ID"
+          sleep 5
+          xcrun simctl io "$SIM_ID" screenshot screenshots/02-home-auth-recovery.png
+          echo "✓ 02-home-auth-recovery.png"
+
+          ls -la screenshots/
+    artifacts:
+      - screenshots/*.png
+      - /tmp/xcodebuild.log
+    publishing:
+      email:
+        recipients:
+          - armandasdourian@gmail.com
+        notify:
+          success: true
+          failure: true
+
   ios-downbad:
     name: Downbad iOS Build
     max_build_duration: 60
