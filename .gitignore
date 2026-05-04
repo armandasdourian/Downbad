@@ -33,3 +33,7 @@ Package.resolved
 *.swp
 *.swo
 *~
+
+# Claude Code
+.claude/settings.local.json
+.claude/worktrees/
