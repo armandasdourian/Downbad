@@ -163,3 +163,117 @@ workflows:
         notify:
           success: true
           failure: true
+
+  ios-downbad-release:
+    name: Downbad Release (App Store / TestFlight)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    # Manual trigger only — do NOT auto-build on push.
+    # Run from Codemagic UI when ready to ship a build.
+    # Will fail until Family Controls (Distribution) entitlement is granted.
+    integrations:
+      app_store_connect: voicegate_appstore
+    environment:
+      groups:
+        - ios_signing
+      vars:
+        XCODE_SCHEME: "Downbad"
+        BUNDLE_ID: "com.voicegate.app"
+        APP_STORE_APPLE_ID: "" # Set after creating App Store Connect record
+      xcode: latest
+    scripts:
+      - name: Set up Xcode project
+        script: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Bump build number
+        script: |
+          # Use App Store Connect's latest build number + 1, so TestFlight uploads never collide.
+          set -e
+          BUILD_NUMBER=$(($(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0) + 1))
+          echo "Using build number: $BUILD_NUMBER"
+          cd "$CM_BUILD_DIR"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "Downbad/Info.plist" 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "Downbad/Info.plist"
+      - name: Set up code signing
+        script: |
+          set -e
+          keychain initialize
+          # Reuse the same dev .p12 — Codemagic's app_store_connect integration will fetch
+          # the matching distribution profile via -allowProvisioningUpdates.
+          echo "$P12_BASE64" | base64 -d > /tmp/downbad.p12
+          keychain add-certificates \
+            --certificate /tmp/downbad.p12 \
+            --certificate-password "$P12_PASSWORD"
+          security find-identity -v -p codesigning
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          P8_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8"
+          echo "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" | base64 -d > "$P8_PATH"
+          chmod 600 "$P8_PATH"
+      - name: Archive for App Store
+        script: |
+          set -o pipefail
+          mkdir -p build/ios/xcarchive build/ios/ipa
+          xcodebuild archive \
+            -project "Downbad.xcodeproj" \
+            -scheme "$XCODE_SCHEME" \
+            -archivePath "build/ios/xcarchive/Downbad.xcarchive" \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8" \
+            DEVELOPMENT_TEAM="Q32TFF7K3U" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 | tee /tmp/xcodebuild.log
+          if grep -q "isn't code signed" /tmp/xcodebuild.log; then
+            echo "ERROR: archive succeeded but binaries are unsigned" >&2
+            exit 1
+          fi
+      - name: Export App Store IPA
+        script: |
+          set -o pipefail
+          cat > /tmp/ExportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>teamID</key><string>Q32TFF7K3U</string>
+            <key>uploadSymbols</key><true/>
+            <key>signingStyle</key><string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "build/ios/xcarchive/Downbad.xcarchive" \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportPath "build/ios/ipa" \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8" \
+            2>&1 | tee -a /tmp/xcodebuild.log
+      - name: Collect xcodebuild logs on failure
+        when:
+          condition: failure
+        script: |
+          echo "===== /tmp/xcodebuild.log (last 300 lines) ====="
+          tail -n 300 /tmp/xcodebuild.log 2>/dev/null || echo "no log"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Auto-distributes to TestFlight internal testers on successful upload.
+        # Set submit_to_app_store: true ONLY when ready to submit to App Review.
+        submit_to_testflight: true
+        submit_to_app_store: false
+      email:
+        recipients:
+          - armandasdourian@gmail.com
+        notify:
+          success: true
+          failure: true
