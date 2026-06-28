@@ -31,7 +31,7 @@ struct OnboardingView: View {
                     case 2: OnbPermission(
                         symbol: "shield.lefthalf.filled",
                         title: "screen time access",
-                        body: "this lets us actually block apps. apple's api, no funny business.",
+                        message: "this lets us actually block apps. apple's api, no funny business.",
                         cta: "grant access",
                         footnote: "ios will ask. tap allow.",
                         mood: .judging,
@@ -39,7 +39,7 @@ struct OnboardingView: View {
                     case 3: OnbPermission(
                         symbol: "camera",
                         title: "camera & mic",
-                        body: "you'll say your phrase. we look + listen. nothing leaves your phone.",
+                        message: "you'll say your phrase. we look + listen. nothing leaves your phone.",
                         cta: "continue",
                         footnote: nil,
                         mood: .sideeye,
@@ -47,7 +47,7 @@ struct OnboardingView: View {
                     case 4: OnbPermission(
                         symbol: "bell.badge",
                         title: "notifications",
-                        body: "when a blocked app is opened, the unlock button sends a notification that brings you here. we can't open downbad without it.",
+                        message: "when a blocked app is opened, the unlock button sends a notification that brings you here. we can't open downbad without it.",
                         cta: "allow",
                         footnote: "critical: without this, the shield button does nothing.",
                         mood: .shocked,
@@ -146,11 +146,11 @@ private struct OnbHowItWorks: View {
 
             VStack(alignment: .leading, spacing: 24) {
                 StepRow(n: "1", title: "pick an app to block",
-                        body: "the one you keep falling into. you know.")
+                        detail: "the one you keep falling into. you know.")
                 StepRow(n: "2", title: "pick an embarrassing phrase",
-                        body: "something you'd rather not say in a quiet room.")
+                        detail: "something you'd rather not say in a quiet room.")
                 StepRow(n: "3", title: "say it out loud to unlock",
-                        body: "we'll be watching. (also, your camera.)")
+                        detail: "we'll be watching. (also, your camera.)")
             }
 
             Spacer()
@@ -164,7 +164,7 @@ private struct OnbHowItWorks: View {
     private struct StepRow: View {
         let n: String
         let title: String
-        let body: String
+        let detail: String
 
         var body: some View {
             HStack(alignment: .top, spacing: 16) {
@@ -181,7 +181,7 @@ private struct OnbHowItWorks: View {
                         .font(.sans(17, weight: .semibold))
                         .tracking(-0.17)
                         .foregroundStyle(Theme.ink)
-                    Text(body)
+                    Text(detail)
                         .font(.sans(14))
                         .foregroundStyle(Theme.inkMuted)
                         .lineSpacing(2)
@@ -196,7 +196,7 @@ private struct OnbHowItWorks: View {
 private struct OnbPermission: View {
     let symbol: String
     let title: String
-    let body: String
+    let message: String
     let cta: String
     let footnote: String?
     let mood: MascotMood
@@ -230,7 +230,7 @@ private struct OnbPermission: View {
                         .lineSpacing(-2)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text(body)
+                    Text(message)
                         .font(.sans(16))
                         .foregroundStyle(Theme.inkMuted)
                         .lineSpacing(3)
