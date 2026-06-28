@@ -12,6 +12,7 @@ enum StorageKeys {
     static let blockedApps = "blockedApps"
     static let defaultUnlockDuration = "defaultUnlockDuration"
     static let pendingUnlockAppID = "pendingUnlockAppID"
+    static let hasOnboarded = "hasOnboarded"
     static let shieldConfigInvocations = "diag.shieldConfigInvocations"
     static let shieldConfigLastAt = "diag.shieldConfigLastAt"
     static let shieldButtonTaps = "diag.shieldButtonTaps"
@@ -173,6 +174,12 @@ final class SharedDefaults {
     var pendingUnlockAppID: String? {
         get { defaults.string(forKey: StorageKeys.pendingUnlockAppID) }
         set { defaults.set(newValue, forKey: StorageKeys.pendingUnlockAppID) }
+    }
+
+    /// Whether the user has completed onboarding. Reset by the "reset onboarding" action in Settings.
+    var hasOnboarded: Bool {
+        get { defaults.bool(forKey: StorageKeys.hasOnboarded) }
+        set { defaults.set(newValue, forKey: StorageKeys.hasOnboarded) }
     }
 
     // MARK: Helpers

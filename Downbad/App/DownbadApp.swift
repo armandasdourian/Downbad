@@ -6,11 +6,70 @@ import DeviceActivity
 struct DownbadApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    @State private var hasOnboarded: Bool
+
+    init() {
+        var onboarded = SharedDefaults.shared.hasOnboarded
+        #if DEBUG
+        // CI / preview launch arguments — let the screenshot workflow force a state.
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-previewSkipOnboarding")  { onboarded = true }
+        if args.contains("-previewForceOnboarding") { onboarded = false }
+        #endif
+        _hasOnboarded = State(initialValue: onboarded)
+    }
+
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            rootView
+                .preferredColorScheme(.light) // cream paper aesthetic — keep light
         }
     }
+
+    // MARK: - Root routing
+
+    @ViewBuilder
+    private var rootView: some View {
+        #if DEBUG
+        if let screen = ProcessInfo.processInfo.environment["DOWNBAD_PREVIEW_SCREEN"] {
+            previewScreen(screen)
+        } else {
+            normalRoot
+        }
+        #else
+        normalRoot
+        #endif
+    }
+
+    @ViewBuilder
+    private var normalRoot: some View {
+        if hasOnboarded {
+            HomeView()
+        } else {
+            OnboardingView {
+                // SharedDefaults.shared.hasOnboarded is set by onboarding itself.
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    hasOnboarded = true
+                }
+            }
+        }
+    }
+
+    #if DEBUG
+    /// Deterministic screen routing for the CI screenshot workflow.
+    /// Triggered via env var DOWNBAD_PREVIEW_SCREEN (set by `SIMCTL_CHILD_...`).
+    /// Only compiled into DEBUG builds; never reachable in a Release/App Store build.
+    @ViewBuilder
+    private func previewScreen(_ name: String) -> some View {
+        switch name {
+        case "onboarding": OnboardingView(onComplete: {})
+        case "settings":   SettingsView()
+        case "addapp":     AddAppView()
+        case "permission": PermissionDeniedView(kind: .screentime, onOpenSettings: {}, onSkip: {})
+        default:           normalRoot
+        }
+    }
+    #endif
 }
 
 // MARK: - App Delegate
@@ -21,10 +80,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Request notification permissions
-        let center = UNUserNotificationCenter.current()
-        center.delegate = self
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+        UNUserNotificationCenter.current().delegate = self
 
         // Start daily device activity monitoring so the extension can re-shield
         // apps even if the main app is killed.

@@ -1,0 +1,14 @@
+title: Downbad
+description: Talk yourself out of doomscrolling.
+theme: jekyll-theme-cayman
+url: https://armandasdourian.github.io
+baseurl: /Downbad
+
+# Show only the actual user-facing pages in the nav, not internal docs.
+include:
+  - index.md
+  - privacy.md
+  - support.md
+exclude:
+  - family-controls-distribution-request.md
+  - README.md
