@@ -26,7 +26,7 @@ concurrency:
 jobs:
   build:
     name: Build + Screenshots
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 30
     env:
       SCHEME: Downbad
@@ -81,13 +81,8 @@ jobs:
         continue-on-error: true
         run: |
           set -e
-          # Pick the first available iPhone simulator on this runner.
-          UDID=$(xcrun simctl list devices available -j | python3 -c "
-import json,sys
-d=json.load(sys.stdin)['devices']
-ids=[dev['udid'] for rt in d for dev in d[rt] if 'iPhone' in dev['name'] and dev.get('isAvailable',True)]
-print(ids[0] if ids else '')
-")
+          # Pick the first available iPhone simulator on this runner (single-line jq).
+          UDID=$(xcrun simctl list devices available -j | jq -r '[.devices[][] | select(.name | test("iPhone")) | .udid] | .[0] // ""')
           if [ -z "$UDID" ]; then echo "No iPhone simulator available"; exit 1; fi
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
           xcrun simctl boot "$UDID" || true
@@ -127,7 +122,7 @@ print(ids[0] if ids else '')
             local name="$1"; shift
             xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
             "$@" >/dev/null 2>&1 || true
-            sleep 4
+            sleep 6
             xcrun simctl io "$UDID" screenshot "screenshots/$name.png" || true
             echo "captured $name"
           }
