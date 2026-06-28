@@ -1,0 +1,136 @@
+name: TestFlight Release
+
+# Archives a signed App Store build and uploads it straight to TestFlight.
+# Uses App Store Connect API-key automatic signing (-allowProvisioningUpdates),
+# so no distribution certificate or provisioning profile needs to be managed by
+# hand — Apple's cloud signing generates them, including the (now-approved)
+# Family Controls distribution entitlement.
+#
+# Required repository secrets:
+#   ASC_KEY_ID         — App Store Connect API Key ID
+#   ASC_ISSUER_ID      — App Store Connect API Issuer ID
+#   ASC_KEY_P8_BASE64  — base64 of the AuthKey_XXXX.p8 file
+#
+# Trigger: manually from the Actions tab (workflow_dispatch) or by pushing a v* tag.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  testflight:
+    name: Archive + Upload to TestFlight
+    runs-on: macos-latest
+    timeout-minutes: 40
+    env:
+      SCHEME: Downbad
+      TEAM_ID: Q32TFF7K3U
+      BUNDLE_ID: com.voicegate.app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Install App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          set -e
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_KEY_P8_BASE64" ]; then
+            echo "::error::Missing ASC_KEY_ID or ASC_KEY_P8_BASE64 secret."
+            exit 1
+          fi
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          echo "Key installed for ID ${ASC_KEY_ID}."
+
+      - name: Compute build number
+        id: ver
+        run: |
+          # Minute-precision, monotonic, unique, and within CFBundleVersion limits.
+          BUILD_NUMBER=$(date -u +%y%m%d%H%M)
+          echo "build=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Build number: $BUILD_NUMBER"
+
+      - name: Archive
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          mkdir -p build
+          xcodebuild archive \
+            -project Downbad.xcodeproj \
+            -scheme "$SCHEME" \
+            -archivePath build/Downbad.xcarchive \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CURRENT_PROJECT_VERSION="${{ steps.ver.outputs.build }}" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 | tee build/archive.log
+          if grep -q "isn't code signed" build/archive.log; then
+            echo "::error::Archive produced unsigned binaries."
+            exit 1
+          fi
+
+      - name: Export + upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          cat > build/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath build/Downbad.xcarchive \
+            -exportOptionsPlist build/ExportOptions.plist \
+            -exportPath build/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            2>&1 | tee build/export.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-logs
+          path: |
+            build/archive.log
+            build/export.log
+          if-no-files-found: ignore
+
+      - name: Done
+        run: |
+          echo "✅ Uploaded build ${{ steps.ver.outputs.build }} to App Store Connect."
+          echo "TestFlight will finish processing in ~5–15 min, then it's installable."
