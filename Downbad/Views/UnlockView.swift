@@ -88,8 +88,8 @@ struct UnlockView: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial.opacity(0.9), in: Circle())
                             .background(Color.black.opacity(0.4), in: Circle())
+                            .background(.ultraThinMaterial, in: Circle())
                     }
                     .buttonStyle(PressScale())
 
@@ -279,8 +279,8 @@ private struct ListeningPill: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial.opacity(0.9))
         .background(Color.black.opacity(0.4))
+        .background(.ultraThinMaterial)
         .clipShape(Capsule(style: .continuous))
     }
 }

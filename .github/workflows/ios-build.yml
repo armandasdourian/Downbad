@@ -1,0 +1,151 @@
+name: iOS Build & Preview
+
+# Compiles the app for the iOS Simulator (verifies it builds) and captures
+# screenshots of key screens. Results appear directly as a PR check — no email,
+# no Codemagic dashboard needed. Screenshots are uploaded as a downloadable
+# artifact on every run.
+#
+# Triggers:
+#   - any PR targeting master  → green/red check on the PR
+#   - pushes to design/feature/preview branches → standalone run
+
+on:
+  pull_request:
+    branches: [ master ]
+  push:
+    branches:
+      - 'design/**'
+      - 'feature/**'
+      - 'preview/**'
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build + Screenshots
+    runs-on: macos-14
+    timeout-minutes: 30
+    env:
+      SCHEME: Downbad
+      BUNDLE_ID: com.voicegate.app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode.app
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for simulator (compile check)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Downbad.xcodeproj \
+            -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            -derivedDataPath ./DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 | tee build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+
+      # ── Screenshots (best-effort; never fails the build) ──────────────────
+      - name: Boot a simulator
+        id: boot
+        continue-on-error: true
+        run: |
+          set -e
+          # Pick the first available iPhone simulator on this runner.
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+import json,sys
+d=json.load(sys.stdin)['devices']
+ids=[dev['udid'] for rt in d for dev in d[rt] if 'iPhone' in dev['name'] and dev.get('isAvailable',True)]
+print(ids[0] if ids else '')
+")
+          if [ -z "$UDID" ]; then echo "No iPhone simulator available"; exit 1; fi
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b || true
+
+      - name: Build for the booted simulator
+        if: steps.boot.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcrun simctl list devices booted
+          xcodebuild build \
+            -project Downbad.xcodeproj \
+            -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -destination "id=${{ steps.boot.outputs.udid }}" \
+            -configuration Debug \
+            -derivedDataPath ./DerivedData \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            > /dev/null 2>&1
+
+      - name: Install + capture screenshots
+        if: steps.boot.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -e
+          UDID="${{ steps.boot.outputs.udid }}"
+          APP=$(find ./DerivedData/Build/Products -name "Downbad.app" -type d | head -1)
+          if [ -z "$APP" ]; then echo "Downbad.app not found"; exit 1; fi
+          echo "App bundle: $APP"
+          xcrun simctl install "$UDID" "$APP"
+          mkdir -p screenshots
+
+          shot () {
+            local name="$1"; shift
+            xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+            "$@" >/dev/null 2>&1 || true
+            sleep 4
+            xcrun simctl io "$UDID" screenshot "screenshots/$name.png" || true
+            echo "captured $name"
+          }
+
+          # Deterministic screens via the DEBUG launch hook (DOWNBAD_PREVIEW_SCREEN).
+          SIMCTL_CHILD_DOWNBAD_PREVIEW_SCREEN=onboarding shot 01-onboarding xcrun simctl launch "$UDID" "$BUNDLE_ID"
+          SIMCTL_CHILD_DOWNBAD_PREVIEW_SCREEN=addapp     shot 02-add-app    xcrun simctl launch "$UDID" "$BUNDLE_ID"
+          SIMCTL_CHILD_DOWNBAD_PREVIEW_SCREEN=settings   shot 03-settings   xcrun simctl launch "$UDID" "$BUNDLE_ID"
+          SIMCTL_CHILD_DOWNBAD_PREVIEW_SCREEN=permission shot 04-permission xcrun simctl launch "$UDID" "$BUNDLE_ID"
+          # Normal launch — onboarding-complete path lands on Home (auth-recovery in sim).
+          shot 05-home xcrun simctl launch "$UDID" "$BUNDLE_ID" -previewSkipOnboarding
+
+          ls -la screenshots/
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/
+          if-no-files-found: warn

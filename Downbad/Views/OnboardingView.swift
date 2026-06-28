@@ -35,7 +35,7 @@ struct OnboardingView: View {
                         cta: "grant access",
                         footnote: "ios will ask. tap allow.",
                         mood: .judging,
-                        action: { Task { try? await blockManager.requestAuthorization(); advance() } })
+                        action: { Task { @MainActor in try? await blockManager.requestAuthorization(); advance() } })
                     case 3: OnbPermission(
                         symbol: "camera",
                         title: "camera & mic",
@@ -43,7 +43,7 @@ struct OnboardingView: View {
                         cta: "continue",
                         footnote: nil,
                         mood: .sideeye,
-                        action: { Task { _ = await SpeechRecognitionManager.requestPermissions(); requestCamera(); advance() } })
+                        action: { Task { @MainActor in _ = await SpeechRecognitionManager.requestPermissions(); requestCamera(); advance() } })
                     case 4: OnbPermission(
                         symbol: "bell.badge",
                         title: "notifications",
