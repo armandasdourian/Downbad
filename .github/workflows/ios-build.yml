@@ -115,6 +115,11 @@ jobs:
           APP=$(find ./DerivedData/Build/Products -name "Downbad.app" -type d | head -1)
           if [ -z "$APP" ]; then echo "Downbad.app not found"; exit 1; fi
           echo "App bundle: $APP"
+          # Strip app extensions before install — the DeviceActivity / ManagedSettings
+          # extension points aren't available in the iOS Simulator and cause installd to
+          # reject the whole bundle ("does not correspond to a known extension point").
+          # The main app's SwiftUI screens don't need the extensions for screenshots.
+          rm -rf "$APP/PlugIns"
           xcrun simctl install "$UDID" "$APP"
           mkdir -p screenshots
 

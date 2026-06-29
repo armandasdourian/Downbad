@@ -25,6 +25,9 @@ targets:
         NSMicrophoneUsageDescription: "Downbad needs microphone access to hear your unlock phrase."
         NSSpeechRecognitionUsageDescription: "Downbad uses speech recognition to verify your unlock phrase."
         ITSAppUsesNonExemptEncryption: false
+        UIAppFonts:
+          - InstrumentSerif-Regular.ttf
+          - InstrumentSerif-Italic.ttf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app
