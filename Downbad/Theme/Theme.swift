@@ -7,11 +7,10 @@ import SwiftUI
 // Italic serif for titles, system sans for body, mono for tiny captions.
 //
 // Fonts: the design specifies Instrument Serif / Inter / JetBrains Mono.
-// None of those ship on iOS. We use SwiftUI's `.serif` design (renders New York)
-// for italic titles, system default for body, and `.monospaced` design for captions.
-// To match the design pixel-for-pixel, drop Instrument Serif font files into
-// Downbad/Resources/Fonts/ and add them to UIAppFonts in Info.plist; then change
-// `Font.serif(...)` below to `Font.custom("InstrumentSerif-Italic", ...)`.
+// Instrument Serif (SIL OFL) is bundled in Downbad/Resources/Fonts/ and registered
+// via UIAppFonts in project.yml, so titles/quotes render in the real design face.
+// Body uses the system sans (SF Pro stands in for Inter); captions use SF Mono.
+// PostScript names: "InstrumentSerif-Regular", "InstrumentSerif-Italic".
 
 enum Theme {
     // MARK: Colors
@@ -59,9 +58,16 @@ enum Theme {
 
 extension Font {
 
-    /// Italic serif — wordmark, screen titles, quoted phrases. Design uses Instrument Serif.
+    /// Italic serif — wordmark, screen titles, quoted phrases. Instrument Serif (bundled).
+    /// The italic face is loaded directly, so do NOT also apply `.italic()` (would double-slant).
+    /// Falls back to the system serif automatically if the font fails to register.
     static func serifItalic(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .regular, design: .serif).italic()
+        .custom("InstrumentSerif-Italic", size: size)
+    }
+
+    /// Upright serif — for the rare non-italic serif need. Instrument Serif regular (bundled).
+    static func serif(_ size: CGFloat) -> Font {
+        .custom("InstrumentSerif-Regular", size: size)
     }
 
     /// Body sans — design uses Inter; we fall through to SF Pro.
