@@ -28,6 +28,10 @@ targets:
         UIAppFonts:
           - InstrumentSerif-Regular.ttf
           - InstrumentSerif-Italic.ttf
+        # App Store validation requires explicit orientations. Downbad is
+        # iPhone-only and portrait-only by design (camera unlock ritual).
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.voicegate.app
@@ -36,6 +40,7 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
     dependencies:
       - target: ShieldConfigurationExtension
       - target: ShieldActionExtension
@@ -52,7 +57,7 @@ targets:
       properties:
         CFBundleDisplayName: ShieldConfigurationExtension
         NSExtension:
-          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration
+          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration-service
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldConfigurationExtension
     settings:
       base:
@@ -70,7 +75,7 @@ targets:
       properties:
         CFBundleDisplayName: ShieldActionExtension
         NSExtension:
-          NSExtensionPointIdentifier: com.apple.ManagedSettings.shield-action
+          NSExtensionPointIdentifier: com.apple.ManagedSettings.shield-action-service
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldActionExtension
     settings:
       base:
@@ -88,7 +93,7 @@ targets:
       properties:
         CFBundleDisplayName: DeviceActivityMonitorExtension
         NSExtension:
-          NSExtensionPointIdentifier: com.apple.DeviceActivity.monitor
+          NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).DeviceActivityMonitorExtension
     settings:
       base:
