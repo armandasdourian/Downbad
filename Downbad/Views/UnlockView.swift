@@ -30,6 +30,12 @@ struct UnlockView: View {
     /// User's brightness before the mirror phase raised it; restored on exit.
     @State private var savedBrightness: CGFloat?
 
+    /// How many phrase words have been matched — drives per-word haptic ticks.
+    @State private var lastMatchedWordCount = 0
+
+    /// Mirror sub-line, picked once per appearance so it varies across sessions.
+    @State private var mirrorLine = MirrorCopy.random()
+
     // Mirror phase
     private enum Phase { case mirror, speak }
     @State private var phase: Phase = .mirror
@@ -97,6 +103,14 @@ struct UnlockView: View {
         .onChange(of: speech.phraseMatched) { matched in
             if matched { handleSuccess() }
         }
+        .onChange(of: speech.transcribedText) { _ in
+            // Haptic tick each time another phrase word lands.
+            let count = matchedWordCount
+            if count > lastMatchedWordCount {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+            lastMatchedWordCount = count
+        }
         .onReceive(mirrorTick) { _ in
             advanceMirror()
         }
@@ -146,7 +160,8 @@ struct UnlockView: View {
                     .foregroundStyle(Theme.ink)
 
                 Text(camera.faceDetected || !permissionsGranted
-                     ? "take it in. this is the person who wants \(appConfig.displayName.lowercased())."
+                     ? mirrorLine.replacingOccurrences(of: "{app}",
+                                                       with: appConfig.displayName.lowercased())
                      : "the judge can't see your face.")
                     .font(.sans(14))
                     .foregroundStyle(Theme.inkMuted)
@@ -217,6 +232,8 @@ struct UnlockView: View {
         guard phase == .mirror else { return }
         phase = .speak
         restoreBrightness()
+        // Soft thud: reflection accepted, proceed to begging.
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         speech.startListening(for: appConfig.unlockPhrase)
     }
 
@@ -237,20 +254,20 @@ struct UnlockView: View {
             }
             .padding(.top, 50) // clear status bar / dynamic island
 
-            // Judge peeking
-            HStack {
-                Spacer()
-                judgeCard
-                    .padding(.trailing, 20)
-                    .padding(.top, 16)
-            }
+            // Teleprompter: the phrase sits at eye level — same spot the
+            // mirror notice occupied — so the user reads it while looking at
+            // their own eyes, newscaster-style. Looking down to read was
+            // breaking the eye contact that gives the ritual its sting.
+            phraseCard
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
 
             Spacer()
 
-            // Phrase card + transcript
-            VStack(spacing: 16) {
-                phraseCard
-                transcriptCard
+            // Bottom: slim transcript feedback + the judge, face unobstructed.
+            HStack(alignment: .bottom, spacing: 12) {
+                transcriptStrip
+                judgeCard
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 24)
@@ -332,39 +349,34 @@ struct UnlockView: View {
         )
     }
 
-    private var transcriptCard: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("you said")
-                .font(.mono(11, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.5))
-                .textCase(.uppercase)
-                .tracking(0.88)
-
-            HStack(alignment: .firstTextBaseline) {
-                Text(speech.transcribedText.isEmpty
-                     ? "start speaking…"
-                     : speech.transcribedText)
-                    .font(.mono(14))
-                    .foregroundStyle(speech.transcribedText.isEmpty
-                                     ? Color.white.opacity(0.4)
-                                     : .white)
-                    .lineSpacing(2)
-                Spacer(minLength: 0)
-            }
+    /// Slim, glanceable transcript. The phrase card's word-highlighting is the
+    /// primary feedback; this exists for "what did it hear?" and errors.
+    private var transcriptStrip: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(speech.transcribedText.isEmpty
+                 ? "start speaking…"
+                 : speech.transcribedText)
+                .font(.mono(12))
+                .foregroundStyle(speech.transcribedText.isEmpty
+                                 ? Color.white.opacity(0.4)
+                                 : .white)
+                .lineLimit(2)
+                .truncationMode(.head)
 
             if let err = speech.error ?? camera.error {
                 Text(err)
                     .font(.mono(11))
                     .foregroundStyle(Theme.pulse.opacity(0.9))
+                    .lineLimit(2)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(Color.black.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.black.opacity(0.45))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
     }
@@ -380,6 +392,15 @@ struct UnlockView: View {
         guard !target.isEmpty else { return 0 }
         if speech.phraseMatched { return 1 }
         return min(1, Double(said.count) / Double(target.count))
+    }
+
+    /// Number of phrase words heard so far — mirrors HighlightedPhrase's logic.
+    private var matchedWordCount: Int {
+        let said = speech.transcribedText.lowercased()
+        return appConfig.unlockPhrase.split(separator: " ").filter { word in
+            let stripped = word.lowercased().filter { !".,!?".contains($0) }
+            return !stripped.isEmpty && said.contains(stripped)
+        }.count
     }
 
     // MARK: - Setup + success
@@ -411,6 +432,7 @@ struct UnlockView: View {
     private func handleSuccess() {
         success = true
         camera.stop()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         AppBlockManager.shared.unlockApp(id: appConfig.id)
     }
 
@@ -450,6 +472,25 @@ struct UnlockView: View {
                 try? await Task.sleep(for: .milliseconds(22))
             }
         }
+    }
+}
+
+// MARK: - Mirror copy
+//
+// The stare-down line rotates per session so the ritual doesn't go stale.
+// "{app}" is replaced with the app's lowercased display name.
+
+private enum MirrorCopy {
+    static let lines = [
+        "take it in. this is the person who wants {app}.",
+        "no filter. just consequences.",
+        "the judge sees you. now you do too.",
+        "hold still. reflect on your choices.",
+        "eye contact, please. you owe yourself that much.",
+    ]
+
+    static func random() -> String {
+        lines.randomElement() ?? lines[0]
     }
 }
 
