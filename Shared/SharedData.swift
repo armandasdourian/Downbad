@@ -13,6 +13,7 @@ enum StorageKeys {
     static let defaultUnlockDuration = "defaultUnlockDuration"
     static let pendingUnlockAppID = "pendingUnlockAppID"
     static let hasOnboarded = "hasOnboarded"
+    static let lastKnownAuthorized = "lastKnownAuthorized"
     static let shieldConfigInvocations = "diag.shieldConfigInvocations"
     static let shieldConfigLastAt = "diag.shieldConfigLastAt"
     static let shieldButtonTaps = "diag.shieldButtonTaps"
@@ -180,6 +181,14 @@ final class SharedDefaults {
     var hasOnboarded: Bool {
         get { defaults.bool(forKey: StorageKeys.hasOnboarded) }
         set { defaults.set(newValue, forKey: StorageKeys.hasOnboarded) }
+    }
+
+    /// Last Screen Time authorization state we observed. FamilyControls'
+    /// authorizationStatus reads .notDetermined for a beat on cold launch even
+    /// when access is granted, so we trust this until the daemon settles.
+    var lastKnownAuthorized: Bool {
+        get { defaults.bool(forKey: StorageKeys.lastKnownAuthorized) }
+        set { defaults.set(newValue, forKey: StorageKeys.lastKnownAuthorized) }
     }
 
     // MARK: Helpers
