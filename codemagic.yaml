@@ -15,23 +15,16 @@ workflows:
   #   the unlock screen won't be reachable here.
   # - For pixel-perfect QA of the UnlockView, the only path is a real
   #   device or MacInCloud + manual run.
+  # NOTE: auto-triggering removed 2026-07-24 — GitHub Actions
+  # (.github/workflows/ios-build.yml + ios-testflight.yml) now handles compile
+  # checks, simulator screenshots, and TestFlight distribution. These Codemagic
+  # workflows are kept for manual runs from the Codemagic UI only. The dev
+  # workflow's provisioning profiles were also invalidated when Family Controls
+  # (Distribution) was enabled on the App IDs, so auto-runs were failing.
   ios-downbad-preview:
     name: Downbad Preview Screenshots
     max_build_duration: 30
     instance_type: mac_mini_m2
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: 'feature/*'
-          include: true
-          source: true
-        - pattern: 'design/*'
-          include: true
-          source: true
-        - pattern: 'preview/*'
-          include: true
-          source: true
     environment:
       vars:
         XCODE_SCHEME: "Downbad"
@@ -149,17 +142,13 @@ workflows:
           success: true
           failure: true
 
+  # NOTE: auto-trigger on master pushes removed 2026-07-24 — TestFlight (via
+  # GitHub Actions) replaced the Firebase dev-build distribution loop. Manual
+  # runs from the Codemagic UI only.
   ios-downbad-dev:
     name: Downbad Dev (signed for installed devices)
     max_build_duration: 60
     instance_type: mac_mini_m2
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: master
-          include: true
-          source: true
     integrations:
       app_store_connect: voicegate_appstore
     environment:
