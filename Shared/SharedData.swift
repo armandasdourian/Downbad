@@ -106,6 +106,10 @@ struct BlockedAppConfig: Codable, Identifiable {
     var isUnlocked: Bool
     var unlockExpiresAt: Date?
 
+    /// Timestamps of recent successful unlocks — the judge remembers.
+    /// Optional so configs stored before this field existed still decode.
+    var unlockHistory: [Date]?
+
     init(displayName: String, unlockPhrase: String, unlockDuration: UnlockDuration, tokenData: Data) {
         self.id = UUID()
         self.displayName = displayName
@@ -114,6 +118,15 @@ struct BlockedAppConfig: Codable, Identifiable {
         self.tokenData = tokenData
         self.isUnlocked = false
         self.unlockExpiresAt = nil
+        self.unlockHistory = nil
+    }
+
+    /// How many times this app was unlocked in the trailing `hours` window.
+    /// Drives the escalation tier of the mirror ritual.
+    func recentUnlockCount(withinHours hours: Double, asOf date: Date = .now) -> Int {
+        (unlockHistory ?? []).filter {
+            $0 <= date && date.timeIntervalSince($0) < hours * 3600
+        }.count
     }
 
     var unlockDuration: UnlockDuration {

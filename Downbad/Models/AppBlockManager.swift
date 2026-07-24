@@ -132,6 +132,14 @@ final class AppBlockManager: ObservableObject {
 
         blockedApps[index].isUnlocked = true
         blockedApps[index].unlockExpiresAt = expiresAt
+
+        // The judge remembers: record this unlock, keep a rolling 24h window
+        // (capped) so the mirror ritual can escalate on repeat visits.
+        var history = blockedApps[index].unlockHistory ?? []
+        history.append(.now)
+        let cutoff = Date().addingTimeInterval(-24 * 3600)
+        blockedApps[index].unlockHistory = Array(history.filter { $0 > cutoff }.suffix(20))
+
         save()
         applyShields()
 
