@@ -1,9 +1,13 @@
 import SwiftUI
+import UIKit
 
 // MARK: - UnlockSuccessView
 //
 // Plays after a successful match. Mascot eye-rolls, then settles into
 // `unimpressed`, then a sarcastic blessing line + "go on then" CTA.
+// If we know the unlocked app's URL scheme (AppLinks), we deep-link the
+// user straight back into it — automatically after a beat, or instantly
+// on tapping the button.
 //
 // Translation of UnlockSuccess in design_handoff_downbad/app/Unlock.jsx.
 
@@ -12,8 +16,11 @@ struct UnlockSuccessView: View {
     let onContinue: () -> Void
 
     @State private var phase: Phase = .roll
+    @State private var didLeave = false
 
     private enum Phase { case roll, settle, caption }
+
+    private var returnURL: URL? { AppLinks.url(for: app.displayName) }
 
     /// Sarcastic blessing — picked once on appear so it doesn't shuffle on re-renders.
     @State private var line: String = Self.lines.randomElement() ?? Self.lines[0]
@@ -51,7 +58,9 @@ struct UnlockSuccessView: View {
                             Text("\(app.displayName) is open for \(durationLabel(app.unlockDuration)).")
                                 .font(.sans(15))
                                 .foregroundStyle(Theme.inkMuted)
-                            Text("see you back here in a bit.")
+                            Text(returnURL != nil
+                                 ? "sending you back. see you at the next relapse."
+                                 : "see you back here in a bit.")
                                 .font(.serifItalic(15))
                                 .foregroundStyle(Theme.inkMuted)
                         }
@@ -65,7 +74,7 @@ struct UnlockSuccessView: View {
                 Spacer()
 
                 if phase == .caption {
-                    PrimaryButton(title: "go on then", action: onContinue)
+                    PrimaryButton(title: "go on then", action: leave)
                         .padding(.horizontal, 24)
                         .transition(.opacity)
                 } else {
@@ -79,7 +88,25 @@ struct UnlockSuccessView: View {
             withAnimation { phase = .settle }
             try? await Task.sleep(for: .seconds(0.3))
             withAnimation { phase = .caption }
+            // Give the blessing a beat to land, then send them back to the
+            // app they begged for. Unknown apps just stay on this screen
+            // until "go on then".
+            if returnURL != nil {
+                try? await Task.sleep(for: .seconds(1.6))
+                leave()
+            }
         }
+    }
+
+    /// Deep-link back into the unlocked app when we know its scheme,
+    /// then dismiss so Downbad is back on Home when the user returns.
+    private func leave() {
+        guard !didLeave else { return }
+        didLeave = true
+        if let url = returnURL {
+            UIApplication.shared.open(url)
+        }
+        onContinue()
     }
 
     private func durationLabel(_ d: UnlockDuration) -> String {
