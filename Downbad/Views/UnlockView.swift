@@ -18,6 +18,18 @@ struct UnlockView: View {
     let appConfig: BlockedAppConfig
     let onDismiss: () -> Void
 
+    /// Escalation tier — from how often this app was unlocked in the last
+    /// 12 hours. Repeat visits get a longer stare and a colder judge.
+    private let tier: MirrorTier
+
+    init(appConfig: BlockedAppConfig, onDismiss: @escaping () -> Void) {
+        self.appConfig = appConfig
+        self.onDismiss = onDismiss
+        let tier = MirrorTier.tier(forRecentUnlocks: appConfig.recentUnlockCount(withinHours: 12))
+        self.tier = tier
+        _mirrorLine = State(initialValue: tier.lines.randomElement() ?? tier.lines[0])
+    }
+
     @StateObject private var camera = CameraManager()
     @StateObject private var speech = SpeechRecognitionManager()
 
@@ -34,13 +46,12 @@ struct UnlockView: View {
     @State private var lastMatchedWordCount = 0
 
     /// Mirror sub-line, picked once per appearance so it varies across sessions.
-    @State private var mirrorLine = MirrorCopy.random()
+    @State private var mirrorLine: String
 
     // Mirror phase
     private enum Phase { case mirror, speak }
     @State private var phase: Phase = .mirror
     @State private var mirrorTime: Double = 0
-    private let mirrorDuration: Double = 3.0
     private let mirrorTick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -150,11 +161,11 @@ struct UnlockView: View {
             // eyes land at normal holding distance — so reading it keeps them
             // looking at their own face instead of glancing to the bottom.
             VStack(alignment: .leading, spacing: 6) {
-                Text("before you beg →")
+                Text(tier.caption)
                     .captionMono()
                     .foregroundStyle(Theme.inkFaint)
 
-                Text("look at yourself.")
+                Text(tier.title)
                     .font(.serifItalic(28))
                     .tracking(-0.56)
                     .foregroundStyle(Theme.ink)
@@ -173,7 +184,7 @@ struct UnlockView: View {
                         Capsule().fill(Color.black.opacity(0.08))
                         Capsule()
                             .fill(Theme.clay)
-                            .frame(width: geo.size.width * min(1, mirrorTime / mirrorDuration))
+                            .frame(width: geo.size.width * min(1, mirrorTime / tier.duration))
                     }
                 }
                 .frame(height: 3)
@@ -195,9 +206,10 @@ struct UnlockView: View {
             Spacer()
 
             // Judge observes from the bottom corner so nothing covers the face.
+            // Mood hardens with each repeat visit — the judge remembers.
             HStack {
                 Spacer()
-                Mascot(mood: .flat, size: 64, paperColor: Theme.cream)
+                Mascot(mood: tier.mood, size: 64, paperColor: Theme.cream)
                     .padding(8)
                     .background(.ultraThinMaterial)
                     .background(Theme.cream.opacity(0.7))
@@ -223,7 +235,7 @@ struct UnlockView: View {
         }
         guard camera.faceDetected else { return }
         mirrorTime += 0.05
-        if mirrorTime >= mirrorDuration {
+        if mirrorTime >= tier.duration {
             beginSpeakPhase()
         }
     }
@@ -475,23 +487,69 @@ struct UnlockView: View {
     }
 }
 
-// MARK: - Mirror copy
+// MARK: - Mirror tiers — the judge remembers
 //
-// The stare-down line rotates per session so the ritual doesn't go stale.
-// "{app}" is replaced with the app's lowercased display name.
+// The mirror ritual escalates with repeat unlocks of the same app inside a
+// 12-hour window: longer stare, colder judge, copy that knows your history.
+// "{app}" in a line is replaced with the app's lowercased display name.
 
-private enum MirrorCopy {
-    static let lines = [
-        "take it in. this is the person who wants {app}.",
-        "no filter. just consequences.",
-        "the judge sees you. now you do too.",
-        "hold still. reflect on your choices.",
-        "eye contact, please. you owe yourself that much.",
-    ]
+private struct MirrorTier {
+    let duration: Double
+    let mood: MascotMood
+    let caption: String
+    let title: String
+    let lines: [String]
 
-    static func random() -> String {
-        lines.randomElement() ?? lines[0]
+    static func tier(forRecentUnlocks count: Int) -> MirrorTier {
+        switch count {
+        case 0:  return first
+        case 1:  return second
+        default: return third
+        }
     }
+
+    /// First visit of the window — the standard ritual.
+    static let first = MirrorTier(
+        duration: 3.0,
+        mood: .flat,
+        caption: "before you beg →",
+        title: "look at yourself.",
+        lines: [
+            "take it in. this is the person who wants {app}.",
+            "no filter. just consequences.",
+            "the judge sees you. now you do too.",
+            "hold still. reflect on your choices.",
+            "eye contact, please. you owe yourself that much.",
+        ]
+    )
+
+    /// Second visit — the judge noticed.
+    static let second = MirrorTier(
+        duration: 4.5,
+        mood: .unimpressed,
+        caption: "before you beg. again →",
+        title: "back already.",
+        lines: [
+            "that didn't last long.",
+            "the judge kept your file open.",
+            "second visit. the judge is taking notes.",
+            "you said you'd be quick last time too.",
+        ]
+    )
+
+    /// Third+ visit — disappointment, extended reflection.
+    static let third = MirrorTier(
+        duration: 6.0,
+        mood: .disappointed,
+        caption: "before you beg. again. →",
+        title: "again.",
+        lines: [
+            "we both knew you'd be back.",
+            "not surprised. just disappointed.",
+            "the judge has stopped counting. (they haven't.)",
+            "take a longer look this time.",
+        ]
+    )
 }
 
 // MARK: - Status pill (top center)
