@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UIKit
 
 // MARK: - UnlockView (Playful variant)
 //
@@ -20,9 +21,14 @@ struct UnlockView: View {
     @StateObject private var camera = CameraManager()
     @StateObject private var speech = SpeechRecognitionManager()
 
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var permissionsGranted = false
     @State private var success = false
     @State private var showMismatch = false
+
+    /// User's brightness before the mirror phase raised it; restored on exit.
+    @State private var savedBrightness: CGFloat?
 
     // Mirror phase
     private enum Phase { case mirror, speak }
@@ -41,7 +47,9 @@ struct UnlockView: View {
                 Color.black.ignoresSafeArea()
             }
 
-            // Subtle dim for legibility
+            // Subtle dim for legibility — suppressed during the mirror phase:
+            // the judge wants you clearly lit, not tastefully shadowed. Fades
+            // back in when the phrase card appears.
             LinearGradient(
                 colors: [
                     Color.black.opacity(0.15),
@@ -51,6 +59,7 @@ struct UnlockView: View {
                 startPoint: .top, endPoint: .bottom
             )
             .ignoresSafeArea()
+            .opacity(phase == .mirror && !success ? 0 : 1)
 
             if success {
                 UnlockSuccessView(app: appConfig, onContinue: onDismiss)
@@ -83,12 +92,27 @@ struct UnlockView: View {
         .onDisappear {
             camera.stop()
             speech.stopListening()
+            restoreBrightness()
         }
         .onChange(of: speech.phraseMatched) { matched in
             if matched { handleSuccess() }
         }
         .onReceive(mirrorTick) { _ in
             advanceMirror()
+        }
+        .onChange(of: scenePhase) { newPhase in
+            // iOS doesn't revert forced brightness on its own — hand it back
+            // whenever we leave the foreground, re-raise if we return mid-mirror.
+            switch newPhase {
+            case .background:
+                restoreBrightness()
+            case .active:
+                if phase == .mirror, permissionsGranted, !success {
+                    raiseBrightness()
+                }
+            default:
+                break
+            }
         }
     }
 
@@ -108,26 +132,9 @@ struct UnlockView: View {
             }
             .padding(.top, 50) // clear status bar / dynamic island
 
-            // Judge, staring. Deadpan.
-            HStack {
-                Spacer()
-                Mascot(mood: .flat, size: 64, paperColor: Theme.cream)
-                    .padding(8)
-                    .background(.ultraThinMaterial)
-                    .background(Theme.cream.opacity(0.7))
-                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .stroke(Color.white.opacity(0.5), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 8)
-                    .padding(.trailing, 20)
-                    .padding(.top, 16)
-            }
-
-            Spacer()
-
-            // Mirror card
+            // Notice card sits high — right around where the user's on-screen
+            // eyes land at normal holding distance — so reading it keeps them
+            // looking at their own face instead of glancing to the bottom.
             VStack(alignment: .leading, spacing: 6) {
                 Text("before you beg →")
                     .captionMono()
@@ -158,7 +165,7 @@ struct UnlockView: View {
                 .padding(.top, 10)
             }
             .padding(.horizontal, 22)
-            .padding(.vertical, 20)
+            .padding(.vertical, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.ultraThinMaterial)
             .background(Theme.cream.opacity(0.9))
@@ -168,7 +175,26 @@ struct UnlockView: View {
                     .stroke(Color.white.opacity(0.5), lineWidth: 1)
             )
             .padding(.horizontal, 16)
-            .padding(.bottom, 24)
+            .padding(.top, 14)
+
+            Spacer()
+
+            // Judge observes from the bottom corner so nothing covers the face.
+            HStack {
+                Spacer()
+                Mascot(mood: .flat, size: 64, paperColor: Theme.cream)
+                    .padding(8)
+                    .background(.ultraThinMaterial)
+                    .background(Theme.cream.opacity(0.7))
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 8)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 28)
+            }
         }
     }
 
@@ -190,6 +216,7 @@ struct UnlockView: View {
     private func beginSpeakPhase() {
         guard phase == .mirror else { return }
         phase = .speak
+        restoreBrightness()
         speech.startListening(for: appConfig.unlockPhrase)
     }
 
@@ -369,6 +396,9 @@ struct UnlockView: View {
 
         if permissionsGranted {
             camera.start()
+            // Nowhere to hide: the mirror gets full backlight. Restored when
+            // the mirror ends, the view closes, or the app backgrounds.
+            if phase == .mirror { raiseBrightness() }
             // Speech starts when the mirror phase completes (beginSpeakPhase).
         } else {
             // No camera to reflect in — skip straight to the speak phase so
@@ -382,6 +412,44 @@ struct UnlockView: View {
         success = true
         camera.stop()
         AppBlockManager.shared.unlockApp(id: appConfig.id)
+    }
+
+    // MARK: - Brightness (mirror phase)
+
+    /// The screen this scene is on. UIScreen.main is deprecated on iOS 16+,
+    /// so resolve via the connected window scene with a fallback.
+    private static func activeScreen() -> UIScreen {
+        (UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.screen)
+            ?? UIScreen.main
+    }
+
+    private func raiseBrightness() {
+        let screen = Self.activeScreen()
+        if savedBrightness == nil { savedBrightness = screen.brightness }
+        animateBrightness(to: 1.0)
+    }
+
+    private func restoreBrightness() {
+        guard let original = savedBrightness else { return }
+        savedBrightness = nil
+        animateBrightness(to: original)
+    }
+
+    /// Step the system brightness over ~0.3s — an instant snap to full is jarring.
+    private func animateBrightness(to target: CGFloat) {
+        let screen = Self.activeScreen()
+        Task { @MainActor in
+            let start = screen.brightness
+            guard abs(start - target) > 0.01 else {
+                screen.brightness = target
+                return
+            }
+            let steps = 14
+            for i in 1...steps {
+                screen.brightness = start + (target - start) * CGFloat(i) / CGFloat(steps)
+                try? await Task.sleep(for: .milliseconds(22))
+            }
+        }
     }
 }
 
