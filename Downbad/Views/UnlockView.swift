@@ -64,19 +64,9 @@ struct UnlockView: View {
                 Color.black.ignoresSafeArea()
             }
 
-            // Subtle dim for legibility — suppressed during the mirror phase:
-            // the judge wants you clearly lit, not tastefully shadowed. Fades
-            // back in when the phrase card appears.
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.15),
-                    Color.black.opacity(0.40),
-                    Color.black.opacity(0.55)
-                ],
-                startPoint: .top, endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            .opacity(phase == .mirror && !success ? 0 : 1)
+            // No dim over the camera — ever. The judge wants the face clearly
+            // visible through the whole ritual; every UI element carries its
+            // own background for text legibility.
 
             if success {
                 UnlockSuccessView(app: appConfig, onContinue: onDismiss)
@@ -132,7 +122,8 @@ struct UnlockView: View {
             case .background:
                 restoreBrightness()
             case .active:
-                if phase == .mirror, permissionsGranted, !success {
+                // Re-raise for either camera act (mirror or speak).
+                if permissionsGranted, !success {
                     raiseBrightness()
                 }
             default:
@@ -243,7 +234,8 @@ struct UnlockView: View {
     private func beginSpeakPhase() {
         guard phase == .mirror else { return }
         phase = .speak
-        restoreBrightness()
+        // Brightness stays raised through the speak act too — the face should
+        // be clearly lit for the entire ritual. Restored on success/exit.
         // Soft thud: reflection accepted, proceed to begging.
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         speech.startListening(for: appConfig.unlockPhrase)
@@ -444,6 +436,7 @@ struct UnlockView: View {
     private func handleSuccess() {
         success = true
         camera.stop()
+        restoreBrightness()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         AppBlockManager.shared.unlockApp(id: appConfig.id)
     }
