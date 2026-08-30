@@ -1,5 +1,6 @@
 import DeviceActivity
 import ManagedSettings
+import UserNotifications
 import Foundation
 
 /// Monitors device activity schedules and re-applies shields when needed.
@@ -36,11 +37,16 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     }
 
     /// Called at threshold events during a monitored interval — for bank
-    /// activities this means the user has spent their banked minutes.
+    /// activities: "warning" fires with one minute of bank left, "cutoff"
+    /// when the bank is spent.
     override func eventDidReachThreshold(
         _ event: DeviceActivityEvent.Name,
         activity: DeviceActivityName
     ) {
+        if event.rawValue == "warning" {
+            postBankWarningIfNeeded(activity)
+            return
+        }
         forceRelockIfBankActivity(activity)
         relockAndApplyShields()
     }
@@ -48,10 +54,32 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     // MARK: - Bank handling
 
     private func forceRelockIfBankActivity(_ activity: DeviceActivityName) {
-        guard activity.rawValue.hasPrefix(Self.bankPrefix),
-              let id = UUID(uuidString: String(activity.rawValue.dropFirst(Self.bankPrefix.count)))
-        else { return }
+        guard let id = bankAppID(from: activity) else { return }
         SharedDefaults.shared.forceRelock(id: id)
+    }
+
+    /// One minute of bank left — give the user closure before the shield returns.
+    private func postBankWarningIfNeeded(_ activity: DeviceActivityName) {
+        guard let id = bankAppID(from: activity),
+              let app = SharedDefaults.shared.blockedApps.first(where: { $0.id == id }),
+              app.isUnlocked
+        else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Downbad"
+        content.body = "\(app.displayName) re-locks after 1 more minute of use. wrap it up."
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "downbad-bank-warn-\(id.uuidString)", content: content, trigger: trigger)
+        )
+    }
+
+    private func bankAppID(from activity: DeviceActivityName) -> UUID? {
+        guard activity.rawValue.hasPrefix(Self.bankPrefix) else { return nil }
+        return UUID(uuidString: String(activity.rawValue.dropFirst(Self.bankPrefix.count)))
     }
 
     // MARK: - Shield Logic

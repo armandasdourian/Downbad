@@ -2,6 +2,7 @@ import Foundation
 import ManagedSettings
 import FamilyControls
 import DeviceActivity
+import UserNotifications
 import Combine
 
 /// Manages shielding and unshielding apps via the Screen Time API.
@@ -104,6 +105,7 @@ final class AppBlockManager: ObservableObject {
         relockTimers.removeValue(forKey: id)
         cancelRelockActivity(id: id)
         cancelBankActivity(id: id)
+        cancelRelockWarning(id: id)
         blockedApps.removeAll { $0.id == id }
         save()
         applyShields()
@@ -158,6 +160,10 @@ final class AppBlockManager: ObservableObject {
             // the unlocked app.
             scheduleRelockActivity(id: id, at: expiresAt)
 
+            // Courtesy warning 60s before the shield returns — the ambush
+            // re-lock mid-scroll was the roughest edge of the locked-state UX.
+            scheduleRelockWarning(id: id, displayName: blockedApps[index].displayName, expiresAt: expiresAt)
+
         case .bank:
             // Time bank: no wall-clock expiry. A DeviceActivity usage-threshold
             // event meters ACTUAL time spent in the app and fires the monitor
@@ -179,6 +185,7 @@ final class AppBlockManager: ObservableObject {
         relockTimers.removeValue(forKey: id)
         cancelRelockActivity(id: id)
         cancelBankActivity(id: id)
+        cancelRelockWarning(id: id)
 
         guard let index = blockedApps.firstIndex(where: { $0.id == id }) else { return }
         blockedApps[index].isUnlocked = false
@@ -279,17 +286,23 @@ final class AppBlockManager: ObservableObject {
             intervalEnd: cal.dateComponents(comps, from: end),
             repeats: false
         )
-        let event = DeviceActivityEvent(
-            applications: [token],
-            threshold: DateComponents(minute: minutes)
-        )
+        var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [
+            DeviceActivityEvent.Name("cutoff"): DeviceActivityEvent(
+                applications: [token],
+                threshold: DateComponents(minute: minutes)
+            )
+        ]
+        // Courtesy warning when one minute of bank remains (the monitor
+        // extension posts the notification when this threshold fires).
+        if minutes >= 2 {
+            events[DeviceActivityEvent.Name("warning")] = DeviceActivityEvent(
+                applications: [token],
+                threshold: DateComponents(minute: minutes - 1)
+            )
+        }
 
         do {
-            try activityCenter.startMonitoring(
-                name,
-                during: schedule,
-                events: [DeviceActivityEvent.Name("cutoff"): event]
-            )
+            try activityCenter.startMonitoring(name, during: schedule, events: events)
         } catch {
             print("Downbad: failed to schedule bank activity: \(error)")
         }
@@ -297,5 +310,34 @@ final class AppBlockManager: ObservableObject {
 
     private func cancelBankActivity(id: UUID) {
         activityCenter.stopMonitoring([bankActivityName(for: id)])
+    }
+
+    // MARK: - Re-lock warnings (timer mode)
+
+    private func warningNotificationID(for id: UUID) -> String {
+        "downbad-warn-\(id.uuidString)"
+    }
+
+    /// Local notification 60s before a timer unlock expires. Fires regardless
+    /// of whether Downbad is running. Skipped for very short remaining windows.
+    private func scheduleRelockWarning(id: UUID, displayName: String, expiresAt: Date) {
+        let delay = expiresAt.addingTimeInterval(-60).timeIntervalSinceNow
+        guard delay > 5 else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Downbad"
+        content.body = "\(displayName) re-locks in 1 minute. wrap it up."
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: warningNotificationID(for: id), content: content, trigger: trigger)
+        )
+    }
+
+    private func cancelRelockWarning(id: UUID) {
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: [warningNotificationID(for: id)])
     }
 }
