@@ -26,6 +26,7 @@ struct AddAppView: View {
     @State private var selectedPreset: PhrasePreset = .pleadingShort
     @State private var customPhrase = ""
     @State private var selectedDuration: UnlockDuration
+    @State private var selectedMode: UnlockMode = .timer
 
     init() {
         _selectedDuration = State(initialValue: SharedDefaults.shared.defaultUnlockDuration)
@@ -343,13 +344,51 @@ struct AddAppView: View {
 
             ScrollView {
                 VStack(spacing: 6) {
+                    // Mode: countdown vs time bank
+                    HStack(spacing: 8) {
+                        ModeCard(
+                            title: "countdown",
+                            detail: "clock starts at unlock. ticks even if you leave.",
+                            selected: selectedMode == .timer,
+                            onTap: { selectedMode = .timer }
+                        )
+                        ModeCard(
+                            title: "time bank",
+                            detail: "only actual time in the app counts.",
+                            selected: selectedMode == .bank && selectedDuration != .restOfDay,
+                            disabled: selectedDuration == .restOfDay,
+                            onTap: {
+                                if selectedDuration != .restOfDay { selectedMode = .bank }
+                            }
+                        )
+                    }
+                    .padding(.bottom, 8)
+
                     ForEach(UnlockDuration.allCases) { duration in
                         DurationRow(
                             duration: duration,
                             selected: selectedDuration == duration,
-                            onTap: { selectedDuration = duration }
+                            onTap: {
+                                selectedDuration = duration
+                                if duration == .restOfDay { selectedMode = .timer }
+                            }
                         )
                     }
+
+                    // Straight talk about a platform behavior users blame on us.
+                    Text("heads up: while an app is locked, ios silences its notifications. apple's rule, not ours. dms will wait.")
+                        .font(.mono(11))
+                        .foregroundStyle(Theme.inkFaint)
+                        .lineSpacing(3)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.creamSoft)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Theme.creamDeep, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .padding(.top, 10)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
@@ -361,6 +400,7 @@ struct AddAppView: View {
                     displayName: displayName.trimmingCharacters(in: .whitespaces),
                     unlockPhrase: finalPhrase,
                     unlockDuration: selectedDuration,
+                    mode: selectedDuration == .restOfDay ? .timer : selectedMode,
                     token: token
                 )
                 dismiss()
@@ -410,6 +450,43 @@ private struct AddHeader: View {
         .padding(.horizontal, 8)
         .padding(.top, 4)
         .padding(.bottom, 8)
+    }
+}
+
+// MARK: - ModeCard
+
+private struct ModeCard: View {
+    let title: String
+    let detail: String
+    let selected: Bool
+    var disabled: Bool = false
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.sans(15, weight: .semibold))
+                    .tracking(-0.15)
+                    .foregroundStyle(selected ? Theme.cream : Theme.ink)
+                Text(detail)
+                    .font(.sans(12))
+                    .foregroundStyle(selected ? Color.white.opacity(0.7) : Theme.inkMuted)
+                    .lineSpacing(1)
+                    .multilineTextAlignment(.leading)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 76, alignment: .topLeading)
+            .background(selected ? Theme.ink : Theme.creamSoft)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(selected ? Theme.ink : Theme.creamDeep, lineWidth: 1.5)
+            )
+            .opacity(disabled ? 0.4 : 1)
+        }
+        .buttonStyle(PressScale())
+        .disabled(disabled)
     }
 }
 

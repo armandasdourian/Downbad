@@ -55,7 +55,9 @@ struct UnlockSuccessView: View {
 
                     if phase == .caption {
                         VStack(spacing: 4) {
-                            Text("\(app.displayName) is open for \(durationLabel(app.unlockDuration)).")
+                            Text(app.unlockMode == .bank
+                                 ? "\(app.displayName) is open for \(durationLabel(app.unlockDuration)) of actual use."
+                                 : "\(app.displayName) is open for \(durationLabel(app.unlockDuration)).")
                                 .font(.sans(15))
                                 .foregroundStyle(Theme.inkMuted)
                             Text(returnURL != nil
