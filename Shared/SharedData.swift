@@ -95,6 +95,16 @@ enum PhrasePreset: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Unlock Mode
+
+enum UnlockMode: String, Codable {
+    /// Countdown from the moment of unlock — ticks even when the app is closed.
+    case timer
+    /// A bank of actual usage: only time spent inside the app counts, metered
+    /// by a DeviceActivity usage-threshold event. Bank expires at midnight.
+    case bank
+}
+
 // MARK: - Blocked App Config
 
 struct BlockedAppConfig: Codable, Identifiable {
@@ -110,7 +120,16 @@ struct BlockedAppConfig: Codable, Identifiable {
     /// Optional so configs stored before this field existed still decode.
     var unlockHistory: [Date]?
 
-    init(displayName: String, unlockPhrase: String, unlockDuration: UnlockDuration, tokenData: Data) {
+    /// Raw unlock mode — optional for decode compatibility; use `unlockMode`.
+    var unlockModeRaw: String?
+
+    var unlockMode: UnlockMode {
+        // .restOfDay as a bank is meaningless — always treat it as a timer.
+        if unlockDurationMinutes == UnlockDuration.restOfDay.rawValue { return .timer }
+        return UnlockMode(rawValue: unlockModeRaw ?? "") ?? .timer
+    }
+
+    init(displayName: String, unlockPhrase: String, unlockDuration: UnlockDuration, mode: UnlockMode = .timer, tokenData: Data) {
         self.id = UUID()
         self.displayName = displayName
         self.unlockPhrase = unlockPhrase
@@ -119,6 +138,7 @@ struct BlockedAppConfig: Codable, Identifiable {
         self.isUnlocked = false
         self.unlockExpiresAt = nil
         self.unlockHistory = nil
+        self.unlockModeRaw = mode.rawValue
     }
 
     /// How many times this app was unlocked in the trailing `hours` window.
@@ -215,6 +235,15 @@ final class SharedDefaults {
 
     func findApp(byTokenData data: Data) -> BlockedAppConfig? {
         blockedApps.first { $0.tokenData == data }
+    }
+
+    /// Force an app back to locked regardless of expiry — used by the monitor
+    /// extension when a time-bank threshold fires or its interval ends.
+    func forceRelock(id: UUID) {
+        updateApp(id: id) {
+            $0.isUnlocked = false
+            $0.unlockExpiresAt = nil
+        }
     }
 
     // MARK: Diagnostics

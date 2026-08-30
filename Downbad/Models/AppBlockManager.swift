@@ -82,13 +82,14 @@ final class AppBlockManager: ObservableObject {
     }
 
     /// Add a new app to the block list and shield it immediately.
-    func addBlockedApp(displayName: String, unlockPhrase: String, unlockDuration: UnlockDuration, token: ApplicationToken) {
+    func addBlockedApp(displayName: String, unlockPhrase: String, unlockDuration: UnlockDuration, mode: UnlockMode = .timer, token: ApplicationToken) {
         guard let tokenData = BlockedAppConfig.encodeToken(token) else { return }
 
         let config = BlockedAppConfig(
             displayName: displayName,
             unlockPhrase: unlockPhrase,
             unlockDuration: unlockDuration,
+            mode: mode,
             tokenData: tokenData
         )
 
@@ -102,6 +103,7 @@ final class AppBlockManager: ObservableObject {
         relockTimers[id]?.cancel()
         relockTimers.removeValue(forKey: id)
         cancelRelockActivity(id: id)
+        cancelBankActivity(id: id)
         blockedApps.removeAll { $0.id == id }
         save()
         applyShields()
@@ -128,10 +130,9 @@ final class AppBlockManager: ObservableObject {
         guard let index = blockedApps.firstIndex(where: { $0.id == id }) else { return }
 
         let duration = blockedApps[index].unlockDuration
-        let expiresAt = duration.expirationDate()
+        let mode = blockedApps[index].unlockMode
 
         blockedApps[index].isUnlocked = true
-        blockedApps[index].unlockExpiresAt = expiresAt
 
         // The judge remembers: record this unlock, keep a rolling 24h window
         // (capped) so the mirror ritual can escalate on repeat visits.
@@ -140,18 +141,36 @@ final class AppBlockManager: ObservableObject {
         let cutoff = Date().addingTimeInterval(-24 * 3600)
         blockedApps[index].unlockHistory = Array(history.filter { $0 > cutoff }.suffix(20))
 
-        save()
-        applyShields()
+        switch mode {
+        case .timer:
+            let expiresAt = duration.expirationDate()
+            blockedApps[index].unlockExpiresAt = expiresAt
+            save()
+            applyShields()
 
-        // In-process timer: instant re-lock if Downbad happens to be running
-        // at expiry. Dies when iOS suspends the app, hence the backstop below.
-        scheduleRelock(id: id, at: expiresAt)
+            // In-process timer: instant re-lock if Downbad happens to be running
+            // at expiry. Dies when iOS suspends the app, hence the backstop below.
+            scheduleRelock(id: id, at: expiresAt)
 
-        // Out-of-process backstop: a DeviceActivity interval that STARTS at
-        // expiry wakes DeviceActivityMonitorExtension (which survives app
-        // suspension) so the shield comes back even while the user is inside
-        // the unlocked app. This is the fix for inconsistent re-locking.
-        scheduleRelockActivity(id: id, at: expiresAt)
+            // Out-of-process backstop: a DeviceActivity interval that STARTS at
+            // expiry wakes DeviceActivityMonitorExtension (which survives app
+            // suspension) so the shield comes back even while the user is inside
+            // the unlocked app.
+            scheduleRelockActivity(id: id, at: expiresAt)
+
+        case .bank:
+            // Time bank: no wall-clock expiry. A DeviceActivity usage-threshold
+            // event meters ACTUAL time spent in the app and fires the monitor
+            // extension when the bank is spent. The monitoring interval runs to
+            // end of day, so an unspent bank naturally expires at midnight.
+            blockedApps[index].unlockExpiresAt = nil
+            save()
+            applyShields()
+
+            if let token = blockedApps[index].applicationToken {
+                scheduleBankActivity(id: id, minutes: max(1, duration.rawValue), token: token)
+            }
+        }
     }
 
     /// Manually re-lock an app before its timer expires.
@@ -159,6 +178,7 @@ final class AppBlockManager: ObservableObject {
         relockTimers[id]?.cancel()
         relockTimers.removeValue(forKey: id)
         cancelRelockActivity(id: id)
+        cancelBankActivity(id: id)
 
         guard let index = blockedApps.firstIndex(where: { $0.id == id }) else { return }
         blockedApps[index].isUnlocked = false
@@ -167,16 +187,17 @@ final class AppBlockManager: ObservableObject {
         applyShields()
     }
 
-    /// Check for and re-lock any apps whose unlock has expired.
+    /// Check for and re-lock any apps whose unlock has expired, and re-sync
+    /// state written by the monitor extension (e.g. spent time banks).
     /// Call this on app launch and when returning to foreground.
     func relockExpiredApps() {
         let relocked = SharedDefaults.shared.relockExpiredApps()
-        if !relocked.isEmpty {
-            blockedApps = SharedDefaults.shared.blockedApps
-            applyShields()
-            for id in relocked {
-                cancelRelockActivity(id: id)
-            }
+        // Always re-read: the extension force-relocks bank apps out-of-process,
+        // and our in-memory copy has no other way to learn about it.
+        blockedApps = SharedDefaults.shared.blockedApps
+        applyShields()
+        for id in relocked {
+            cancelRelockActivity(id: id)
         }
     }
 
@@ -229,5 +250,52 @@ final class AppBlockManager: ObservableObject {
 
     private func cancelRelockActivity(id: UUID) {
         activityCenter.stopMonitoring([relockActivityName(for: id)])
+    }
+
+    // MARK: - Time-bank activities
+
+    private func bankActivityName(for id: UUID) -> DeviceActivityName {
+        DeviceActivityName("Downbad.Bank.\(id.uuidString)")
+    }
+
+    /// Meter actual usage of the app: an event with a usage threshold fires
+    /// the monitor extension once the user has ACCUMULATED `minutes` of real
+    /// time inside the app (across any number of visits). Interval runs to end
+    /// of day so an unspent bank expires at midnight.
+    private func scheduleBankActivity(id: UUID, minutes: Int, token: ApplicationToken) {
+        let name = bankActivityName(for: id)
+        activityCenter.stopMonitoring([name])
+
+        let now = Date()
+        let cal = Calendar.current
+        let endOfDay = cal.startOfDay(for: now).addingTimeInterval(24 * 3600 - 60)
+        // DeviceActivity requires intervals ≥ 15 minutes — pad past midnight
+        // if the bank was opened in the day's final minutes.
+        let end = max(endOfDay, now.addingTimeInterval(16 * 60))
+
+        let comps: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
+        let schedule = DeviceActivitySchedule(
+            intervalStart: cal.dateComponents(comps, from: now),
+            intervalEnd: cal.dateComponents(comps, from: end),
+            repeats: false
+        )
+        let event = DeviceActivityEvent(
+            applications: [token],
+            threshold: DateComponents(minute: minutes)
+        )
+
+        do {
+            try activityCenter.startMonitoring(
+                name,
+                during: schedule,
+                events: [DeviceActivityEvent.Name("cutoff"): event]
+            )
+        } catch {
+            print("Downbad: failed to schedule bank activity: \(error)")
+        }
+    }
+
+    private func cancelBankActivity(id: UUID) {
+        activityCenter.stopMonitoring([bankActivityName(for: id)])
     }
 }

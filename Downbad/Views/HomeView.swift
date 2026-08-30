@@ -256,8 +256,13 @@ struct AppRow: View {
     }
 
     private var subtitle: String {
-        if app.isUnlocked, let expiry = app.unlockExpiresAt {
-            return "unlocks for \(Self.formatRemaining(expiry.timeIntervalSince(now)))"
+        if app.isUnlocked {
+            if let expiry = app.unlockExpiresAt {
+                return "unlocks for \(Self.formatRemaining(expiry.timeIntervalSince(now)))"
+            }
+            // Bank mode: usage is metered by the system and not readable here,
+            // so show the bank size rather than a live countdown.
+            return "unlocked · \(app.unlockDuration.displayName.lowercased()) of use banked"
         }
         // Quote preview, truncated to ~40 chars to match design.
         let phrase = app.unlockPhrase
